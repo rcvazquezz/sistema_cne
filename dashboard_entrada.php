@@ -45,6 +45,15 @@ foreach ($municipios as $m) {
     }
     $municipios_por_estado[$eid][] = ['id' => $m['id'], 'nombre' => $m['nombre']];
 }
+
+$estados_lista_js = array_map(function ($e) {
+    return ['id' => (string) $e['id'], 'nombre' => $e['nombre']];
+}, $estados);
+$inst_lista_js = [];
+foreach ($instituciones as $inst) {
+    $inst_lista_js[] = ['id' => (string) $inst['id'], 'nombre' => $inst['nombre']];
+}
+$inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
 ?>
 
 <!DOCTYPE html>
@@ -62,8 +71,6 @@ foreach ($municipios as $m) {
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
     <?php require __DIR__ . '/includes/realtime_head.php'; ?>
     <?php require __DIR__ . '/includes/cne_ciudadano_mayus.php'; ?>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
-    <link rel="stylesheet" href="recursos/css/cne_select2_nueva_solicitud.css?v=2" />
     <style>
         * { box-sizing: border-box; }
         html, body { height: 100%; margin: 0; padding: 0; }
@@ -554,6 +561,12 @@ foreach ($municipios as $m) {
         .tramite-search-button.open .chevron {
             transform: rotate(180deg);
         }
+        .tramite-search-button.input-error { border-color: #ef4444 !important; }
+        .tramite-search-button.input-success { border-color: #10b981 !important; }
+        .tramite-search-button.campos-desde-ciudadano { border-color: #10b981 !important; }
+        .tramite-search-button.ciudadano-dato-alterado { border-color: #ef4444 !important; }
+        .tramite-search-button.ciudadano-campo-protegido { border-color: #10b981 !important; }
+        .tramite-search-button.ciudadano-campo-na-editable { border-color: #f59e0b !important; }
         
         .tramite-search-dropdown {
             position: absolute;
@@ -1126,14 +1139,22 @@ foreach ($municipios as $m) {
                                     </div>
                                 </div>
                                 <div>
-                                    <label for="estado_id" class="block mb-2 font-semibold text-gray-700">Estado</label>
-                                    <select id="estado_id" name="estado_id"
-                                        class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                        <option value="">Seleccione un estado</option>
-                                        <?php foreach ($estados as $estado): ?>
-                                            <option value="<?php echo $estado['id']; ?>"><?php echo htmlspecialchars($estado['nombre']); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <label for="estado-search-button" class="block mb-2 font-semibold text-gray-700">Estado</label>
+                                    <div class="tramite-search-wrapper">
+                                        <button type="button" class="tramite-search-button" id="estado-search-button" aria-haspopup="listbox">
+                                            <span class="selected-tramite-content">
+                                                <span class="selected-tramite-text tramite-placeholder">Seleccione un estado</span>
+                                            </span>
+                                            <i class="fas fa-chevron-down chevron"></i>
+                                        </button>
+                                        <div class="tramite-search-dropdown" id="estado-search-dropdown">
+                                            <div class="tramite-search-input-container">
+                                                <input type="text" class="tramite-search-input" id="estado-search-input" placeholder="Buscar estado..." autocomplete="off" aria-label="Buscar estado">
+                                            </div>
+                                            <div class="tramite-search-results" id="estado-search-results"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="estado_id" name="estado_id" value="">
                                     <div id="error-estado" class="error-message hidden"></div>
                                 </div>
                             </div>
@@ -1143,11 +1164,22 @@ foreach ($municipios as $m) {
                             <!-- Columna izquierda: Municipio + Correo electrónico -->
                             <div class="space-y-4">
                                 <div>
-                                    <label for="municipio_id" class="block mb-2 font-semibold text-gray-700">Municipio</label>
-                                    <select id="municipio_id" name="municipio_id" disabled
-                                        class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                        <option value="">Seleccione un municipio</option>
-                                    </select>
+                                    <label for="municipio-search-button" class="block mb-2 font-semibold text-gray-700">Municipio</label>
+                                    <div class="tramite-search-wrapper">
+                                        <button type="button" class="tramite-search-button" id="municipio-search-button" disabled aria-haspopup="listbox">
+                                            <span class="selected-tramite-content">
+                                                <span class="selected-tramite-text tramite-placeholder">Seleccione un municipio</span>
+                                            </span>
+                                            <i class="fas fa-chevron-down chevron"></i>
+                                        </button>
+                                        <div class="tramite-search-dropdown" id="municipio-search-dropdown">
+                                            <div class="tramite-search-input-container">
+                                                <input type="text" class="tramite-search-input" id="municipio-search-input" placeholder="Buscar municipio..." autocomplete="off" aria-label="Buscar municipio" disabled>
+                                            </div>
+                                            <div class="tramite-search-results" id="municipio-search-results"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="municipio_id" name="municipio_id" value="" disabled>
                                     <div id="error-municipio" class="error-message hidden"></div>
                                 </div>
                                 <div>
@@ -1171,7 +1203,7 @@ foreach ($municipios as $m) {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                                 <!-- Institución -->
                                 <div>
-                                    <label for="institucion" class="block mb-2 font-semibold text-gray-700">Institución *</label>
+                                    <label for="institucion-search-button" class="block mb-2 font-semibold text-gray-700">Institución *</label>
                                     <?php
                                         $personalInst = null;
                                         $otrasInst = [];
@@ -1183,16 +1215,21 @@ foreach ($municipios as $m) {
                                             }
                                         }
                                     ?>
-                                    <select id="institucion" name="institucion" required data-personal-id="<?php echo $personalInst['id'] ?? ''; ?>"
-                                        class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                        <?php if ($personalInst): ?>
-                                            <option value="<?php echo $personalInst['id']; ?>" selected>Personal</option>
-                                        <?php endif; ?>
-                                        <?php foreach ($otrasInst as $institucion): ?>
-                                            <option value="<?php echo $institucion['id']; ?>"><?php echo htmlspecialchars($institucion['nombre']); ?></option>
-                                        <?php endforeach; ?>
-                                        <option value="otro">Otro...</option>
-                                    </select>
+                                    <div class="tramite-search-wrapper">
+                                        <button type="button" class="tramite-search-button" id="institucion-search-button" aria-haspopup="listbox">
+                                            <span class="selected-tramite-content">
+                                                <span class="selected-tramite-text tramite-placeholder">Seleccione una institución</span>
+                                            </span>
+                                            <i class="fas fa-chevron-down chevron"></i>
+                                        </button>
+                                        <div class="tramite-search-dropdown" id="institucion-search-dropdown">
+                                            <div class="tramite-search-input-container">
+                                                <input type="text" class="tramite-search-input" id="institucion-search-input" placeholder="Buscar institución..." autocomplete="off" aria-label="Buscar institución">
+                                            </div>
+                                            <div class="tramite-search-results" id="institucion-search-results"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="institucion" name="institucion" value="<?php echo $personalInst ? htmlspecialchars((string)$personalInst['id']) : ''; ?>" required data-personal-id="<?php echo $personalInst['id'] ?? ''; ?>">
                                     <div id="error-institucion" class="error-message hidden"></div>
                                     <div id="institucion-otro-wrapper" class="mt-3 hidden">
                                         <input 
@@ -1647,10 +1684,7 @@ foreach ($municipios as $m) {
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/i18n/es.js"></script>
-    <script src="recursos/js/cne_select2_nueva_solicitud.js?v=3"></script>
+    <script src="recursos/js/cne_nueva_solicitud_combos_busqueda.js?v=1"></script>
     <script>
         // Variables globales
         let tiposTramiteData = {};
@@ -1667,6 +1701,8 @@ foreach ($municipios as $m) {
         /** Valores opcionales devueltos por la última búsqueda exitosa de ciudadano (correo, dirección, estado, municipio). */
         let snapshotDatosOpcionalesCiudadanoEntrada = null;
         const MUNICIPIOS_POR_ESTADO = <?php echo json_encode($municipios_por_estado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        const CNE_NS_ESTADOS = <?php echo json_encode($estados_lista_js, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        const CNE_NS_INST = <?php echo json_encode($inst_lista_js, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
@@ -1676,6 +1712,18 @@ foreach ($municipios as $m) {
             inicializarBusqueda();
             inicializarCustomSelectGenero();
             inicializarTramiteSearch();
+            if (typeof window.cneNuevaSolicitudCombosInit === 'function') {
+                window.cneNuevaSolicitudCombosInit({
+                    estadosLista: CNE_NS_ESTADOS,
+                    institucionesLista: CNE_NS_INST,
+                    municipiosPorEstado: MUNICIPIOS_POR_ESTADO,
+                    ids: {
+                        estado: { h: 'estado_id', b: 'estado-search-button', d: 'estado-search-dropdown', i: 'estado-search-input', r: 'estado-search-results' },
+                        municipio: { h: 'municipio_id', b: 'municipio-search-button', d: 'municipio-search-dropdown', i: 'municipio-search-input', r: 'municipio-search-results' },
+                        institucion: { h: 'institucion', b: 'institucion-search-button', d: 'institucion-search-dropdown', i: 'institucion-search-input', r: 'institucion-search-results' }
+                    }
+                });
+            }
             inicializarBotonesTramite();
             inicializarInstitucionOtro();
             inicializarDropdownUsuario(); // Nuevo: inicializa el dropdown del usuario
@@ -1696,13 +1744,6 @@ foreach ($municipios as $m) {
                         quitarMarcaCamposDesdeCiudadanoEntrada();
                     }
                 });
-            }
-            
-            // Estado-Municipio: iniciar municipio deshabilitado
-            const municipioSelect = document.getElementById('municipio_id');
-            if (municipioSelect) {
-                municipioSelect.disabled = true;
-                municipioSelect.innerHTML = '<option value="">Seleccione un municipio</option>';
             }
             
             const subtramiteSelect = document.getElementById('subtramite_id');
@@ -2400,27 +2441,8 @@ foreach ($municipios as $m) {
         }
         
         function populateMunicipios(estadoId) {
-            const municipioSelect = document.getElementById('municipio_id');
-            if (!municipioSelect) return;
-            if (window.jQuery && jQuery(municipioSelect).hasClass('select2-hidden-accessible')) {
-                jQuery(municipioSelect).select2('destroy');
-            }
-            municipioSelect.innerHTML = '<option value="">Seleccione un municipio</option>';
-            if (!estadoId) {
-                municipioSelect.value = '';
-                municipioSelect.disabled = true;
-                if (typeof window.cneSelect2NuevaSolicitudReinitMunicipio === 'function') {
-                    window.cneSelect2NuevaSolicitudReinitMunicipio('entrada');
-                }
-                return;
-            }
-            const lista = MUNICIPIOS_POR_ESTADO[estadoId] || [];
-            const options = lista.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
-            municipioSelect.innerHTML = '<option value="">Seleccione un municipio</option>' + options;
-            municipioSelect.disabled = false;
-            municipioSelect.value = '';
-            if (typeof window.cneSelect2NuevaSolicitudReinitMunicipio === 'function') {
-                window.cneSelect2NuevaSolicitudReinitMunicipio('entrada');
+            if (typeof window.cneNuevaSolicitudCombosRefrescarMunicipios === 'function') {
+                window.cneNuevaSolicitudCombosRefrescarMunicipios(estadoId);
             }
         }
         
@@ -2530,9 +2552,10 @@ foreach ($municipios as $m) {
         
         function validarInstitucion(select) {
             const errorDiv = document.getElementById('error-institucion');
+            const visual = document.getElementById('institucion-search-button');
             const valor = select.value;
             if (!valor) {
-                mostrarError(select, errorDiv, 'La institución es obligatoria');
+                mostrarError(visual || select, errorDiv, 'La institución es obligatoria');
                 return false;
             }
             if (valor === 'otro') {
@@ -2545,7 +2568,7 @@ foreach ($municipios as $m) {
                 }
                 mostrarExito(otroInput, otroError);
             }
-            mostrarExito(select, errorDiv);
+            mostrarExito(visual || select, errorDiv);
             return true;
         }
         
@@ -2562,20 +2585,23 @@ foreach ($municipios as $m) {
         
         function validarEstado(select) {
             const errorDiv = document.getElementById('error-estado');
+            const visual = document.getElementById('estado-search-button');
             if (!errorDiv || !select) return true;
             if (!select.value) {
-                select.classList.remove('input-error');
+                if (visual) visual.classList.remove('input-error');
+                else select.classList.remove('input-error');
                 errorDiv.classList.add('hidden');
                 return true;
             }
-            mostrarExito(select, errorDiv);
+            mostrarExito(visual || select, errorDiv);
             return true;
         }
         
         function validarMunicipio(select) {
             const errorDiv = document.getElementById('error-municipio');
+            const visual = document.getElementById('municipio-search-button');
             if (!errorDiv || !select) return true;
-            mostrarExito(select, errorDiv);
+            mostrarExito(visual || select, errorDiv);
             return true;
         }
         
@@ -2611,12 +2637,21 @@ foreach ($municipios as $m) {
             const clsProt = ['ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'campos-desde-ciudadano', 'input-success'];
             const est = document.getElementById('estado_id');
             const mun = document.getElementById('municipio_id');
+            const estBtn = document.getElementById('estado-search-button');
+            const munBtn = document.getElementById('municipio-search-button');
+            const munInp = document.getElementById('municipio-search-input');
             const dir = document.getElementById('direccion');
             [est, mun].forEach(el => {
                 if (!el) return;
                 el.removeAttribute('disabled');
                 el.classList.remove(...clsProt, 'pointer-events-none');
             });
+            [estBtn, munBtn].forEach(btn => {
+                if (!btn) return;
+                btn.removeAttribute('disabled');
+                btn.classList.remove(...clsProt, 'pointer-events-none');
+            });
+            if (munInp) munInp.removeAttribute('disabled');
             if (dir) {
                 dir.removeAttribute('readonly');
                 dir.classList.remove(...clsProt);
@@ -2636,6 +2671,9 @@ foreach ($municipios as $m) {
             const munReal = fkReal(d.municipio_id);
             const estEl = document.getElementById('estado_id');
             const munEl = document.getElementById('municipio_id');
+            const estBtn = document.getElementById('estado-search-button');
+            const munBtn = document.getElementById('municipio-search-button');
+            const munInp = document.getElementById('municipio-search-input');
             const dirEl = document.getElementById('direccion');
             if (estEl) {
                 estEl.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
@@ -2646,6 +2684,16 @@ foreach ($municipios as $m) {
                     estEl.classList.add(marcaNa);
                 }
             }
+            if (estBtn) {
+                estBtn.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
+                if (estReal) {
+                    estBtn.setAttribute('disabled', 'disabled');
+                    estBtn.classList.add(marcaProt, 'pointer-events-none', 'campos-desde-ciudadano', 'input-success');
+                } else {
+                    estBtn.removeAttribute('disabled');
+                    estBtn.classList.add(marcaNa);
+                }
+            }
             if (munEl) {
                 munEl.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
                 if (munReal) {
@@ -2654,6 +2702,23 @@ foreach ($municipios as $m) {
                 } else {
                     munEl.removeAttribute('disabled');
                     munEl.classList.add(marcaNa);
+                }
+            }
+            if (munBtn) {
+                munBtn.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
+                if (munReal) {
+                    munBtn.setAttribute('disabled', 'disabled');
+                    munBtn.classList.add(marcaProt, 'pointer-events-none', 'campos-desde-ciudadano', 'input-success');
+                } else {
+                    munBtn.removeAttribute('disabled');
+                    munBtn.classList.add(marcaNa);
+                }
+            }
+            if (munInp) {
+                if (munReal) {
+                    munInp.setAttribute('disabled', 'disabled');
+                } else if (!munEl || !munEl.disabled) {
+                    munInp.removeAttribute('disabled');
                 }
             }
             if (dirEl) {
@@ -2779,6 +2844,8 @@ foreach ($municipios as $m) {
             document.getElementById('custom-genero-button')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('estado_id')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('municipio_id')?.classList.remove('campos-desde-ciudadano');
+            document.getElementById('estado-search-button')?.classList.remove('campos-desde-ciudadano');
+            document.getElementById('municipio-search-button')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('ciudadano_email')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('direccion')?.classList.remove('campos-desde-ciudadano');
         }
@@ -2806,17 +2873,27 @@ foreach ($municipios as $m) {
             const eidMarca = data && data.estado_id != null ? parseInt(String(data.estado_id), 10) : 0;
             if (data && !isNaN(eidMarca) && eidMarca > 0) {
                 const est = document.getElementById('estado_id');
+                const estB = document.getElementById('estado-search-button');
                 if (est) {
                     est.classList.add(marca, 'input-success');
                     est.classList.remove('input-error');
+                }
+                if (estB) {
+                    estB.classList.add(marca, 'input-success');
+                    estB.classList.remove('input-error');
                 }
             }
             const midMarca = data && data.municipio_id != null ? parseInt(String(data.municipio_id), 10) : 0;
             if (data && !isNaN(midMarca) && midMarca > 0) {
                 const mun = document.getElementById('municipio_id');
+                const munB = document.getElementById('municipio-search-button');
                 if (mun) {
                     mun.classList.add(marca, 'input-success');
                     mun.classList.remove('input-error');
+                }
+                if (munB) {
+                    munB.classList.add(marca, 'input-success');
+                    munB.classList.remove('input-error');
                 }
             }
             const emailRaw = data && data.ciudadano_email != null ? String(data.ciudadano_email).trim() : '';
@@ -2859,7 +2936,9 @@ foreach ($municipios as $m) {
             const dirEl = document.getElementById('direccion');
             const estEl = document.getElementById('estado_id');
             const munEl = document.getElementById('municipio_id');
-            [emailEl, dirEl, estEl, munEl].forEach(el => {
+            const estBtn = document.getElementById('estado-search-button');
+            const munBtn = document.getElementById('municipio-search-button');
+            [emailEl, dirEl, estEl, munEl, estBtn, munBtn].forEach(el => {
                 if (el) el.classList.remove(clsAlt);
             });
             const snap = snapshotDatosOpcionalesCiudadanoEntrada;
@@ -2891,28 +2970,48 @@ foreach ($municipios as $m) {
             if (curEst !== snap.estado_id) {
                 estEl?.classList.add(clsAlt);
                 estEl?.classList.remove(marca, 'input-success', 'input-error');
+                estBtn?.classList.add(clsAlt);
+                estBtn?.classList.remove(marca, 'input-success', 'input-error');
             } else if (snap.estado_id !== '') {
                 estEl?.classList.add(marca, 'input-success');
                 estEl?.classList.remove('input-error');
+                estBtn?.classList.add(marca, 'input-success');
+                estBtn?.classList.remove('input-error');
             } else {
                 estEl?.classList.remove(marca, 'input-success');
+                estBtn?.classList.remove(marca, 'input-success');
             }
 
             const curMun = munEl ? String(munEl.value || '') : '';
             if (curMun !== snap.municipio_id) {
                 munEl?.classList.add(clsAlt);
                 munEl?.classList.remove(marca, 'input-success', 'input-error');
+                munBtn?.classList.add(clsAlt);
+                munBtn?.classList.remove(marca, 'input-success', 'input-error');
             } else if (snap.municipio_id !== '') {
                 munEl?.classList.add(marca, 'input-success');
                 munEl?.classList.remove('input-error');
+                munBtn?.classList.add(marca, 'input-success');
+                munBtn?.classList.remove('input-error');
             } else {
                 munEl?.classList.remove(marca, 'input-success');
+                munBtn?.classList.remove(marca, 'input-success');
             }
         }
 
         function marcarConflictoDatosCedulaEntrada(activo) {
             const ids = ['nombres', 'apellidos', 'telefono-codigo', 'telefono-numero', 'cedula-numero', 'estado_id', 'municipio_id'];
             ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (activo) {
+                    el.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+                    el.classList.add('input-error');
+                } else {
+                    el.classList.remove('input-error');
+                }
+            });
+            ['estado-search-button', 'municipio-search-button'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (activo) {
@@ -3212,6 +3311,9 @@ foreach ($municipios as $m) {
                 if (!el) return;
                 el.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none', 'loading-input');
             });
+            ['estado-search-button', 'municipio-search-button', 'institucion-search-button'].forEach(id => {
+                document.getElementById(id)?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none', 'loading-input');
+            });
             if (flatpickrFechaNacimiento && flatpickrFechaNacimiento.altInput) {
                 flatpickrFechaNacimiento.altInput.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable');
             }
@@ -3275,10 +3377,10 @@ foreach ($municipios as $m) {
             document.getElementById('tipo_solicitud').value = 'normal';
             tipoSolicitudActual = 'normal';
             populateMunicipios(document.getElementById('estado_id')?.value || '');
-            if (typeof window.cneSelect2NuevaSolicitudInit === 'function') {
-                window.cneSelect2NuevaSolicitudInit('entrada');
-                document.getElementById('institucion')?.dispatchEvent(new Event('change'));
+            if (typeof window.cneNuevaSolicitudCombosSyncInstitucionBoton === 'function') {
+                window.cneNuevaSolicitudCombosSyncInstitucionBoton();
             }
+            document.getElementById('institucion')?.dispatchEvent(new Event('change'));
         }
 
         function limpiarCamposCiudadanoAntesDeBusquedaEntrada() {
@@ -3294,6 +3396,8 @@ foreach ($municipios as $m) {
             document.getElementById('custom-genero-button')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano');
             document.getElementById('estado_id')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
             document.getElementById('municipio_id')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+            document.getElementById('estado-search-button')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+            document.getElementById('municipio-search-button')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
             document.getElementById('nombres').value = '';
             document.getElementById('apellidos').value = '';
             document.getElementById('telefono-codigo').value = '0412';
@@ -3303,14 +3407,18 @@ foreach ($municipios as $m) {
             document.getElementById('genero').dispatchEvent(new Event('change'));
             if (flatpickrFechaNacimiento) flatpickrFechaNacimiento.clear();
             else document.getElementById('fecha_nacimiento').value = '';
-            document.getElementById('estado_id').value = '';
-            populateMunicipios('');
-            document.getElementById('municipio_id').value = '';
             document.getElementById('direccion').value = '';
-            if (typeof window.cneSelect2NuevaSolicitudInit === 'function') {
-                window.cneSelect2NuevaSolicitudInit('entrada');
-                document.getElementById('institucion')?.dispatchEvent(new Event('change'));
+            if (typeof window.cneNuevaSolicitudCombosSetEstadoValor === 'function') {
+                window.cneNuevaSolicitudCombosSetEstadoValor('');
+            } else {
+                document.getElementById('estado_id').value = '';
+                populateMunicipios('');
+                document.getElementById('municipio_id').value = '';
             }
+            if (typeof window.cneNuevaSolicitudCombosSyncInstitucionBoton === 'function') {
+                window.cneNuevaSolicitudCombosSyncInstitucionBoton();
+            }
+            document.getElementById('institucion')?.dispatchEvent(new Event('change'));
         }
 
         function inicializarBusquedaCiudadanoPorCedulaEntrada() {
@@ -3406,21 +3514,28 @@ foreach ($municipios as $m) {
                             requestAnimationFrame(() => { fechaNacimientoEntradaProgrammatic = false; });
                         }
 
-                        const estadoSelect = document.getElementById('estado_id');
-                        const municipioSelect = document.getElementById('municipio_id');
                         const eidRawEnt = data.estado_id != null ? parseInt(String(data.estado_id), 10) : 0;
-                        if (estadoSelect && !isNaN(eidRawEnt) && eidRawEnt > 0) {
-                            estadoSelect.value = String(eidRawEnt);
-                            estadoSelect.dispatchEvent(new Event('change'));
+                        if (!isNaN(eidRawEnt) && eidRawEnt > 0) {
+                            if (typeof window.cneNuevaSolicitudCombosSetEstadoValor === 'function') {
+                                window.cneNuevaSolicitudCombosSetEstadoValor(String(eidRawEnt));
+                            } else {
+                                const estadoSelect = document.getElementById('estado_id');
+                                if (estadoSelect) {
+                                    estadoSelect.value = String(eidRawEnt);
+                                    estadoSelect.dispatchEvent(new Event('change'));
+                                }
+                            }
                         }
                         const midNumEnt = data.municipio_id != null ? parseInt(String(data.municipio_id), 10) : 0;
                         const mid = !isNaN(midNumEnt) && midNumEnt > 0 ? String(midNumEnt) : '';
-                        if (municipioSelect && mid) {
+                        if (mid) {
                             const aplicarMunicipio = () => {
                                 if (seq !== busquedaCiudadanoSeqEntrada) return;
-                                municipioSelect.value = mid;
-                                if (window.jQuery && jQuery(municipioSelect).hasClass('select2-hidden-accessible')) {
-                                    jQuery(municipioSelect).val(mid).trigger('change');
+                                if (typeof window.cneNuevaSolicitudCombosSetMunicipioValor === 'function') {
+                                    window.cneNuevaSolicitudCombosSetMunicipioValor(mid);
+                                } else {
+                                    const municipioSelect = document.getElementById('municipio_id');
+                                    if (municipioSelect) municipioSelect.value = mid;
                                 }
                             };
                             requestAnimationFrame(aplicarMunicipio);

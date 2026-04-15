@@ -43,6 +43,14 @@ foreach ($municipios as $m) {
     if (!isset($municipios_por_estado[$eid])) $municipios_por_estado[$eid] = [];
     $municipios_por_estado[$eid][] = ['id' => $m['id'], 'nombre' => $m['nombre']];
 }
+$estados_lista_js = array_map(function ($e) {
+    return ['id' => (string) $e['id'], 'nombre' => $e['nombre']];
+}, $estados);
+$inst_lista_js = [];
+foreach ($instituciones as $inst) {
+    $inst_lista_js[] = ['id' => (string) $inst['id'], 'nombre' => $inst['nombre']];
+}
+$inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
 $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
 ?>
 <!DOCTYPE html>
@@ -60,8 +68,6 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
     <?php require __DIR__ . '/includes/realtime_head.php'; ?>
     <?php require __DIR__ . '/includes/cne_ciudadano_mayus.php'; ?>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
-    <link rel="stylesheet" href="recursos/css/cne_select2_nueva_solicitud.css?v=2" />
     <style>
         * { box-sizing: border-box; }
         html, body { height: 100%; margin: 0; padding: 0; }
@@ -287,6 +293,12 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         .tramite-search-button .selected-tramite-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
         .tramite-search-button .chevron { transition: transform 0.3s; }
         .tramite-search-button.open .chevron { transform: rotate(180deg); }
+        .tramite-search-button.input-error { border-color: #ef4444 !important; }
+        .tramite-search-button.input-success { border-color: #10b981 !important; }
+        .tramite-search-button.campos-desde-ciudadano { border-color: #10b981 !important; }
+        .tramite-search-button.ciudadano-dato-alterado { border-color: #ef4444 !important; }
+        .tramite-search-button.ciudadano-campo-protegido { border-color: #10b981 !important; }
+        .tramite-search-button.ciudadano-campo-na-editable { border-color: #f59e0b !important; }
         .tramite-search-input-container { padding: 12px; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; position: sticky; top: 0; z-index: 10; }
         .tramite-search-results { max-height: 250px; overflow-y: auto; }
         .tramite-search-option.selected { background-color: #eff6ff; color: #1e40af; font-weight: 500; position: relative; }
@@ -650,14 +662,22 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                                     </div>
                                 </div>
                                 <div>
-                                    <label for="estado_id-empleado" class="block mb-2 font-semibold text-gray-700">Estado</label>
-                                    <select id="estado_id-empleado" name="estado_id"
-                                        class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                        <option value="">Seleccione un estado</option>
-                                        <?php foreach ($estados as $estado): ?>
-                                            <option value="<?php echo $estado['id']; ?>"><?php echo htmlspecialchars($estado['nombre']); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <label for="estado-search-button-empleado" class="block mb-2 font-semibold text-gray-700">Estado</label>
+                                    <div class="tramite-search-wrapper">
+                                        <button type="button" class="tramite-search-button" id="estado-search-button-empleado" aria-haspopup="listbox">
+                                            <span class="selected-tramite-content">
+                                                <span class="selected-tramite-text tramite-placeholder">Seleccione un estado</span>
+                                            </span>
+                                            <i class="fas fa-chevron-down chevron"></i>
+                                        </button>
+                                        <div class="tramite-search-dropdown" id="estado-search-dropdown-empleado">
+                                            <div class="tramite-search-input-container">
+                                                <input type="text" class="tramite-search-input" id="estado-search-input-empleado" placeholder="Buscar estado..." autocomplete="off" aria-label="Buscar estado">
+                                            </div>
+                                            <div class="tramite-search-results" id="estado-search-results-empleado"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="estado_id-empleado" name="estado_id" value="">
                                     <div id="error-estado-empleado" class="error-message hidden"></div>
                                 </div>
                             </div>
@@ -665,11 +685,22 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                                 <div class="space-y-4">
                                     <div>
-                                        <label for="municipio_id-empleado" class="block mb-2 font-semibold text-gray-700">Municipio</label>
-                                        <select id="municipio_id-empleado" name="municipio_id" disabled
-                                            class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                            <option value="">Seleccione un municipio</option>
-                                        </select>
+                                        <label for="municipio-search-button-empleado" class="block mb-2 font-semibold text-gray-700">Municipio</label>
+                                        <div class="tramite-search-wrapper">
+                                            <button type="button" class="tramite-search-button" id="municipio-search-button-empleado" disabled aria-haspopup="listbox">
+                                                <span class="selected-tramite-content">
+                                                    <span class="selected-tramite-text tramite-placeholder">Seleccione un municipio</span>
+                                                </span>
+                                                <i class="fas fa-chevron-down chevron"></i>
+                                            </button>
+                                            <div class="tramite-search-dropdown" id="municipio-search-dropdown-empleado">
+                                                <div class="tramite-search-input-container">
+                                                    <input type="text" class="tramite-search-input" id="municipio-search-input-empleado" placeholder="Buscar municipio..." autocomplete="off" aria-label="Buscar municipio" disabled>
+                                                </div>
+                                                <div class="tramite-search-results" id="municipio-search-results-empleado"></div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" id="municipio_id-empleado" name="municipio_id" value="" disabled>
                                         <div id="error-municipio-empleado" class="error-message hidden"></div>
                                     </div>
                                     <div>
@@ -700,17 +731,22 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                             ?>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                                 <div>
-                                    <label for="institucion-empleado" class="block mb-2 font-semibold text-gray-700">Institución *</label>
-                                    <select id="institucion-empleado" name="institucion" required data-personal-id="<?php echo $personalInstEmp['id'] ?? ''; ?>"
-                                        class="w-full p-3 md:p-4 border-2 border-gray-300 rounded-lg transition-all duration-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                                        <?php if ($personalInstEmp): ?>
-                                            <option value="<?php echo $personalInstEmp['id']; ?>" selected>Personal</option>
-                                        <?php endif; ?>
-                                        <?php foreach ($otrasInstEmp as $institucion): ?>
-                                            <option value="<?php echo $institucion['id']; ?>"><?php echo htmlspecialchars($institucion['nombre']); ?></option>
-                                        <?php endforeach; ?>
-                                        <option value="otro">Otro...</option>
-                                    </select>
+                                    <label for="institucion-search-button-empleado" class="block mb-2 font-semibold text-gray-700">Institución *</label>
+                                    <div class="tramite-search-wrapper">
+                                        <button type="button" class="tramite-search-button" id="institucion-search-button-empleado" aria-haspopup="listbox">
+                                            <span class="selected-tramite-content">
+                                                <span class="selected-tramite-text tramite-placeholder">Seleccione una institución</span>
+                                            </span>
+                                            <i class="fas fa-chevron-down chevron"></i>
+                                        </button>
+                                        <div class="tramite-search-dropdown" id="institucion-search-dropdown-empleado">
+                                            <div class="tramite-search-input-container">
+                                                <input type="text" class="tramite-search-input" id="institucion-search-input-empleado" placeholder="Buscar institución..." autocomplete="off" aria-label="Buscar institución">
+                                            </div>
+                                            <div class="tramite-search-results" id="institucion-search-results-empleado"></div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="institucion-empleado" name="institucion" value="<?php echo $personalInstEmp ? htmlspecialchars((string)$personalInstEmp['id']) : ''; ?>" required data-personal-id="<?php echo $personalInstEmp['id'] ?? ''; ?>">
                                     <div id="error-institucion-empleado" class="error-message hidden"></div>
                                     <div id="institucion-otro-wrapper-empleado" class="mt-3 hidden">
                                         <input type="text" id="institucion-otro-empleado" name="institucion_otro" placeholder="Ingrese el nombre de la institución"
@@ -1070,10 +1106,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/i18n/es.js"></script>
-    <script src="recursos/js/cne_select2_nueva_solicitud.js?v=3"></script>
+    <script src="recursos/js/cne_nueva_solicitud_combos_busqueda.js?v=1"></script>
     <script>
         // ===== INICIO: Función de inicialización del menú (copiada de dashboard_entrada.php) =====
         function inicializarMenu() {
@@ -1254,6 +1287,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         document.body.appendChild(toastContainer);
 
         const MUNICIPIOS_POR_ESTADO_EMP = <?php echo json_encode($municipios_por_estado ?? [], JSON_UNESCAPED_UNICODE); ?>;
+        const CNE_NS_ESTADOS_EMP = <?php echo json_encode($estados_lista_js, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        const CNE_NS_INST_EMP = <?php echo json_encode($inst_lista_js, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         const userCoordinacionId = <?php echo (int) ($_SESSION['coordinacion_id'] ?? $coordinacion_id ?? 0); ?>;
         const MI_AREA_DEFAULT_EMP = userCoordinacionId;
         let tiposTramiteDataEmp = [];
@@ -1360,11 +1395,6 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             inicializarFormularioNuevaSolicitud();
             inicializarValidacionesFormEmpleado();
             inicializarModalesSolicitudEmp();
-            const munEmp = document.getElementById('municipio_id-empleado');
-            if (munEmp) {
-                munEmp.disabled = true;
-                munEmp.innerHTML = '<option value="">Seleccione un municipio</option>';
-            }
             setInterval(fetchNotificaciones, 30000);
             fetch('ajax/ping_actividad.php', { credentials: 'same-origin' }).catch(() => {});
             setInterval(function() {
@@ -1547,6 +1577,18 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         }
 
         function inicializarFormularioNuevaSolicitud() {
+            if (typeof window.cneNuevaSolicitudCombosInit === 'function') {
+                window.cneNuevaSolicitudCombosInit({
+                    estadosLista: CNE_NS_ESTADOS_EMP,
+                    institucionesLista: CNE_NS_INST_EMP,
+                    municipiosPorEstado: MUNICIPIOS_POR_ESTADO_EMP,
+                    ids: {
+                        estado: { h: 'estado_id-empleado', b: 'estado-search-button-empleado', d: 'estado-search-dropdown-empleado', i: 'estado-search-input-empleado', r: 'estado-search-results-empleado' },
+                        municipio: { h: 'municipio_id-empleado', b: 'municipio-search-button-empleado', d: 'municipio-search-dropdown-empleado', i: 'municipio-search-input-empleado', r: 'municipio-search-results-empleado' },
+                        institucion: { h: 'institucion-empleado', b: 'institucion-search-button-empleado', d: 'institucion-search-dropdown-empleado', i: 'institucion-search-input-empleado', r: 'institucion-search-results-empleado' }
+                    }
+                });
+            }
             const instSelect = document.getElementById('institucion-empleado');
             const otroWrap = document.getElementById('institucion-otro-wrapper-empleado');
             instSelect?.addEventListener('change', function() {
@@ -2008,26 +2050,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             return true;
         }
         function populateMunicipiosEmpleado(estadoId) {
-            const sel = document.getElementById('municipio_id-empleado');
-            if (!sel) return;
-            if (window.jQuery && jQuery(sel).hasClass('select2-hidden-accessible')) {
-                jQuery(sel).select2('destroy');
-            }
-            sel.innerHTML = '<option value="">Seleccione un municipio</option>';
-            if (!estadoId) {
-                sel.value = '';
-                sel.disabled = true;
-                if (typeof window.cneSelect2NuevaSolicitudReinitMunicipio === 'function') {
-                    window.cneSelect2NuevaSolicitudReinitMunicipio('empleado');
-                }
-                return;
-            }
-            const list = MUNICIPIOS_POR_ESTADO_EMP[estadoId] || [];
-            list.forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.nombre}</option>`; });
-            sel.disabled = false;
-            sel.value = '';
-            if (typeof window.cneSelect2NuevaSolicitudReinitMunicipio === 'function') {
-                window.cneSelect2NuevaSolicitudReinitMunicipio('empleado');
+            if (typeof window.cneNuevaSolicitudCombosRefrescarMunicipios === 'function') {
+                window.cneNuevaSolicitudCombosRefrescarMunicipios(estadoId);
             }
         }
 
