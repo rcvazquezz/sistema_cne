@@ -511,14 +511,33 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             }
         }
         
-        /* Estilos para el nuevo dropdown de búsqueda de Tipo de Trámite */
+        /* Estilos para el nuevo dropdown de búsqueda de Tipo de Trámite (Nueva Solicitud) */
+        #seccion-nueva-solicitud .select2-container {
+            width: 100% !important;
+            max-width: 100%;
+        }
+        #seccion-nueva-solicitud .select2-selection__rendered {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            min-height: 45px;
+            height: auto !important;
+            line-height: 1.35;
+            padding-right: 2.25rem !important;
+            box-sizing: border-box;
+        }
+
         .tramite-search-wrapper {
             position: relative;
+            width: 100% !important;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
         }
         
         .tramite-search-button {
             width: 100%;
-            padding: 12px;
+            padding: 10px 2.5rem 10px 12px;
             border: 2px solid #d1d5db;
             border-radius: 0.5rem;
             background-color: white;
@@ -527,8 +546,10 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
-            transition: all 0.3s;
-            min-height: 48px;
+            transition: all 0.2s;
+            min-height: 45px;
+            height: auto;
+            box-sizing: border-box;
         }
         
         .tramite-search-button:hover {
@@ -545,16 +566,23 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             display: flex;
             align-items: center;
             gap: 8px;
+            min-width: 0;
+            flex: 1;
+            padding-right: 0.25rem;
         }
         
         .tramite-search-button .selected-tramite-text {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 90%;
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            word-break: break-word;
+            line-height: 1.35;
+            max-width: none !important;
         }
         
         .tramite-search-button .chevron {
+            flex-shrink: 0;
+            margin-left: 0.5rem;
             transition: transform 0.3s;
         }
         
@@ -684,10 +712,6 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
         @media (max-width: 768px) {
             .tramite-search-dropdown {
                 max-height: 300px;
-            }
-            
-            .tramite-search-button .selected-tramite-text {
-                max-width: 85%;
             }
             
             .tramite-search-results {

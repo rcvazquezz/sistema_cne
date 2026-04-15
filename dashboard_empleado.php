@@ -256,10 +256,15 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         .btn-tramite-inmediato { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; transition: all 0.3s; }
         .btn-tramite-inmediato:hover:not(:disabled) { background: linear-gradient(135deg, #059669 0%, #047857 100%); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
         .btn-tramite-inmediato:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-        .tramite-search-wrapper { position: relative; }
+        #seccion-nueva-solicitud .select2-container { width: 100% !important; max-width: 100%; }
+        #seccion-nueva-solicitud .select2-selection__rendered {
+            white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+            min-height: 45px; height: auto !important; line-height: 1.35; padding-right: 2.25rem !important; box-sizing: border-box;
+        }
+        .tramite-search-wrapper { position: relative; width: 100% !important; max-width: 100%; min-width: 0; box-sizing: border-box; }
         .tramite-search-button {
-            width: 100%; padding: 12px; border: 2px solid #d1d5db; border-radius: 0.5rem; background: #fff; text-align: left;
-            display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 48px; transition: all 0.2s;
+            width: 100%; padding: 10px 2.5rem 10px 12px; border: 2px solid #d1d5db; border-radius: 0.5rem; background: #fff; text-align: left;
+            display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 45px; height: auto; transition: all 0.2s; box-sizing: border-box;
         }
         .tramite-search-button:hover { border-color: #3b82f6; }
         .tramite-search-button:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
@@ -289,9 +294,12 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             .telefono-input-compact { min-width: 100px; }
         }
 
-        .tramite-search-button .selected-tramite-content { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-        .tramite-search-button .selected-tramite-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%; }
-        .tramite-search-button .chevron { transition: transform 0.3s; }
+        .tramite-search-button .selected-tramite-content { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; padding-right: 0.25rem; }
+        .tramite-search-button .selected-tramite-text {
+            white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+            word-break: break-word; line-height: 1.35; max-width: none !important;
+        }
+        .tramite-search-button .chevron { flex-shrink: 0; margin-left: 0.5rem; transition: transform 0.3s; }
         .tramite-search-button.open .chevron { transform: rotate(180deg); }
         .tramite-search-button.input-error { border-color: #ef4444 !important; }
         .tramite-search-button.input-success { border-color: #10b981 !important; }
@@ -308,7 +316,6 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         .search-highlight { background-color: #fef3c7; padding: 0 2px; border-radius: 2px; }
         @media (max-width: 768px) {
             .tramite-search-dropdown { max-height: 300px; }
-            .tramite-search-button .selected-tramite-text { max-width: 85%; }
             .tramite-search-results { max-height: 200px; }
         }
 
@@ -1994,7 +2001,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         }
         function validarInstitucionEmpleado() {
             const sel = document.getElementById('institucion-empleado');
-            if (!sel?.value) { mostrarErrorEmpleado(sel, 'error-institucion-empleado', 'La institución es obligatoria'); return false; }
+            const vis = document.getElementById('institucion-search-button-empleado');
+            if (!sel?.value) { mostrarErrorEmpleado(vis || sel, 'error-institucion-empleado', 'La institución es obligatoria'); return false; }
             if (sel.value === 'otro') {
                 const otroInput = document.getElementById('institucion-otro-empleado');
                 const nombre = (otroInput?.value || '').trim();
@@ -2004,7 +2012,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 }
                 mostrarExitoEmpleado(otroInput, 'error-institucion-otro-empleado');
             }
-            mostrarExitoEmpleado(sel, 'error-institucion-empleado');
+            mostrarExitoEmpleado(vis || sel, 'error-institucion-empleado');
             return true;
         }
         function validarAreaEmpleado() {
@@ -2018,17 +2026,19 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         }
         function validarEstadoEmpleado(select) {
             const err = document.getElementById('error-estado-empleado');
+            const vis = document.getElementById('estado-search-button-empleado');
             if (!err || !select) return true;
             if (!select.value) {
-                limpiarErrorEmpleado(select, 'error-estado-empleado');
+                limpiarErrorEmpleado(vis || select, 'error-estado-empleado');
                 return true;
             }
-            mostrarExitoEmpleado(select, 'error-estado-empleado');
+            mostrarExitoEmpleado(vis || select, 'error-estado-empleado');
             return true;
         }
         function validarMunicipioEmpleado(select) {
             if (!select) return true;
-            mostrarExitoEmpleado(select, 'error-municipio-empleado');
+            const vis = document.getElementById('municipio-search-button-empleado');
+            mostrarExitoEmpleado(vis || select, 'error-municipio-empleado');
             return true;
         }
         function validarTipoTramiteEmpleado() {
@@ -2079,12 +2089,21 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const clsProt = ['ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'campos-desde-ciudadano', 'input-success'];
             const est = document.getElementById('estado_id-empleado');
             const mun = document.getElementById('municipio_id-empleado');
+            const estBtn = document.getElementById('estado-search-button-empleado');
+            const munBtn = document.getElementById('municipio-search-button-empleado');
+            const munInp = document.getElementById('municipio-search-input-empleado');
             const dir = document.getElementById('direccion-empleado');
             [est, mun].forEach(el => {
                 if (!el) return;
                 el.removeAttribute('disabled');
                 el.classList.remove(...clsProt, 'pointer-events-none');
             });
+            [estBtn, munBtn].forEach(btn => {
+                if (!btn) return;
+                btn.removeAttribute('disabled');
+                btn.classList.remove(...clsProt, 'pointer-events-none');
+            });
+            if (munInp) munInp.removeAttribute('disabled');
             if (dir) {
                 dir.removeAttribute('readonly');
                 dir.classList.remove(...clsProt);
@@ -2104,6 +2123,9 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const munReal = fkReal(d.municipio_id);
             const estEl = document.getElementById('estado_id-empleado');
             const munEl = document.getElementById('municipio_id-empleado');
+            const estBtn = document.getElementById('estado-search-button-empleado');
+            const munBtn = document.getElementById('municipio-search-button-empleado');
+            const munInp = document.getElementById('municipio-search-input-empleado');
             const dirEl = document.getElementById('direccion-empleado');
             if (estEl) {
                 estEl.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
@@ -2114,6 +2136,16 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                     estEl.classList.add(marcaNa);
                 }
             }
+            if (estBtn) {
+                estBtn.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
+                if (estReal) {
+                    estBtn.setAttribute('disabled', 'disabled');
+                    estBtn.classList.add(marcaProt, 'pointer-events-none', 'campos-desde-ciudadano', 'input-success');
+                } else {
+                    estBtn.removeAttribute('disabled');
+                    estBtn.classList.add(marcaNa);
+                }
+            }
             if (munEl) {
                 munEl.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
                 if (munReal) {
@@ -2122,6 +2154,23 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 } else {
                     munEl.removeAttribute('disabled');
                     munEl.classList.add(marcaNa);
+                }
+            }
+            if (munBtn) {
+                munBtn.classList.remove(marcaProt, marcaNa, 'pointer-events-none', 'input-error');
+                if (munReal) {
+                    munBtn.setAttribute('disabled', 'disabled');
+                    munBtn.classList.add(marcaProt, 'pointer-events-none', 'campos-desde-ciudadano', 'input-success');
+                } else {
+                    munBtn.removeAttribute('disabled');
+                    munBtn.classList.add(marcaNa);
+                }
+            }
+            if (munInp) {
+                if (munReal) {
+                    munInp.setAttribute('disabled', 'disabled');
+                } else if (!munEl || !munEl.disabled) {
+                    munInp.removeAttribute('disabled');
                 }
             }
             if (dirEl) {
@@ -2252,6 +2301,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             document.getElementById('custom-genero-button-emp')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano');
             document.getElementById('estado_id-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
             document.getElementById('municipio_id-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+            document.getElementById('estado-search-button-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+            document.getElementById('municipio-search-button-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
             document.getElementById('nombres-empleado').value = '';
             document.getElementById('apellidos-empleado').value = '';
             document.getElementById('telefono-codigo-empleado').value = '0412';
@@ -2264,14 +2315,18 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             }
             if (flatpickrFechaNacimientoEmpleado) flatpickrFechaNacimientoEmpleado.clear();
             else document.getElementById('fecha_nacimiento-empleado').value = '';
-            document.getElementById('estado_id-empleado').value = '';
-            populateMunicipiosEmpleado('');
-            document.getElementById('municipio_id-empleado').value = '';
             document.getElementById('direccion-empleado').value = '';
-            if (typeof window.cneSelect2NuevaSolicitudInit === 'function') {
-                window.cneSelect2NuevaSolicitudInit('empleado');
-                document.getElementById('institucion-empleado')?.dispatchEvent(new Event('change'));
+            if (typeof window.cneNuevaSolicitudCombosSetEstadoValor === 'function') {
+                window.cneNuevaSolicitudCombosSetEstadoValor('');
+            } else {
+                document.getElementById('estado_id-empleado').value = '';
+                populateMunicipiosEmpleado('');
+                document.getElementById('municipio_id-empleado').value = '';
             }
+            if (typeof window.cneNuevaSolicitudCombosSyncInstitucionBoton === 'function') {
+                window.cneNuevaSolicitudCombosSyncInstitucionBoton();
+            }
+            document.getElementById('institucion-empleado')?.dispatchEvent(new Event('change'));
         }
 
         function inicializarBusquedaCiudadanoPorCedulaEmpleado() {
@@ -2364,18 +2419,26 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                         }
                         const eidRaw = d.estado_id != null ? parseInt(String(d.estado_id), 10) : 0;
                         if (!isNaN(eidRaw) && eidRaw > 0) {
-                            document.getElementById('estado_id-empleado').value = String(eidRaw);
-                            document.getElementById('estado_id-empleado').dispatchEvent(new Event('change'));
+                            if (typeof window.cneNuevaSolicitudCombosSetEstadoValor === 'function') {
+                                window.cneNuevaSolicitudCombosSetEstadoValor(String(eidRaw));
+                            } else {
+                                const estEl = document.getElementById('estado_id-empleado');
+                                if (estEl) {
+                                    estEl.value = String(eidRaw);
+                                    estEl.dispatchEvent(new Event('change'));
+                                }
+                            }
                         }
                         const midNum = d.municipio_id != null ? parseInt(String(d.municipio_id), 10) : 0;
                         const mid = !isNaN(midNum) && midNum > 0 ? String(midNum) : '';
-                        const munSel = document.getElementById('municipio_id-empleado');
-                        if (munSel && mid) {
+                        if (mid) {
                             const aplicarMunicipio = () => {
                                 if (seq !== busquedaCiudadanoSeqEmp) return;
-                                munSel.value = mid;
-                                if (window.jQuery && jQuery(munSel).hasClass('select2-hidden-accessible')) {
-                                    jQuery(munSel).val(mid).trigger('change');
+                                if (typeof window.cneNuevaSolicitudCombosSetMunicipioValor === 'function') {
+                                    window.cneNuevaSolicitudCombosSetMunicipioValor(mid);
+                                } else {
+                                    const munSel = document.getElementById('municipio_id-empleado');
+                                    if (munSel) munSel.value = mid;
                                 }
                             };
                             requestAnimationFrame(aplicarMunicipio);
@@ -2422,6 +2485,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             document.getElementById('custom-genero-button-emp')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('estado_id-empleado')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('municipio_id-empleado')?.classList.remove('campos-desde-ciudadano');
+            document.getElementById('estado-search-button-empleado')?.classList.remove('campos-desde-ciudadano');
+            document.getElementById('municipio-search-button-empleado')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('ciudadano_email-empleado')?.classList.remove('campos-desde-ciudadano');
             document.getElementById('direccion-empleado')?.classList.remove('campos-desde-ciudadano');
         }
@@ -2449,17 +2514,27 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const eidMarca = d && d.estado_id != null ? parseInt(String(d.estado_id), 10) : 0;
             if (d && !isNaN(eidMarca) && eidMarca > 0) {
                 const est = document.getElementById('estado_id-empleado');
+                const estB = document.getElementById('estado-search-button-empleado');
                 if (est) {
                     est.classList.add(marca, 'input-success');
                     est.classList.remove('input-error');
+                }
+                if (estB) {
+                    estB.classList.add(marca, 'input-success');
+                    estB.classList.remove('input-error');
                 }
             }
             const midMarca = d && d.municipio_id != null ? parseInt(String(d.municipio_id), 10) : 0;
             if (d && !isNaN(midMarca) && midMarca > 0) {
                 const mun = document.getElementById('municipio_id-empleado');
+                const munB = document.getElementById('municipio-search-button-empleado');
                 if (mun) {
                     mun.classList.add(marca, 'input-success');
                     mun.classList.remove('input-error');
+                }
+                if (munB) {
+                    munB.classList.add(marca, 'input-success');
+                    munB.classList.remove('input-error');
                 }
             }
             const emailRaw = d && d.ciudadano_email != null ? String(d.ciudadano_email).trim() : '';
@@ -2502,7 +2577,9 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const dirEl = document.getElementById('direccion-empleado');
             const estEl = document.getElementById('estado_id-empleado');
             const munEl = document.getElementById('municipio_id-empleado');
-            [emailEl, dirEl, estEl, munEl].forEach(el => {
+            const estBtn = document.getElementById('estado-search-button-empleado');
+            const munBtn = document.getElementById('municipio-search-button-empleado');
+            [emailEl, dirEl, estEl, munEl, estBtn, munBtn].forEach(el => {
                 if (el) el.classList.remove(clsAlt);
             });
             const snap = snapshotDatosOpcionalesCiudadanoEmpleado;
@@ -2534,28 +2611,48 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             if (curEst !== snap.estado_id) {
                 estEl?.classList.add(clsAlt);
                 estEl?.classList.remove(marca, 'input-success', 'input-error');
+                estBtn?.classList.add(clsAlt);
+                estBtn?.classList.remove(marca, 'input-success', 'input-error');
             } else if (snap.estado_id !== '') {
                 estEl?.classList.add(marca, 'input-success');
                 estEl?.classList.remove('input-error');
+                estBtn?.classList.add(marca, 'input-success');
+                estBtn?.classList.remove('input-error');
             } else {
                 estEl?.classList.remove(marca, 'input-success');
+                estBtn?.classList.remove(marca, 'input-success');
             }
 
             const curMun = munEl ? String(munEl.value || '') : '';
             if (curMun !== snap.municipio_id) {
                 munEl?.classList.add(clsAlt);
                 munEl?.classList.remove(marca, 'input-success', 'input-error');
+                munBtn?.classList.add(clsAlt);
+                munBtn?.classList.remove(marca, 'input-success', 'input-error');
             } else if (snap.municipio_id !== '') {
                 munEl?.classList.add(marca, 'input-success');
                 munEl?.classList.remove('input-error');
+                munBtn?.classList.add(marca, 'input-success');
+                munBtn?.classList.remove('input-error');
             } else {
                 munEl?.classList.remove(marca, 'input-success');
+                munBtn?.classList.remove(marca, 'input-success');
             }
         }
 
         function marcarConflictoDatosCedulaEmpleado(activo) {
             const ids = ['nombres-empleado', 'apellidos-empleado', 'telefono-codigo-empleado', 'telefono-numero-empleado', 'cedula-numero-empleado', 'estado_id-empleado', 'municipio_id-empleado'];
             ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (activo) {
+                    el.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado');
+                    el.classList.add('input-error');
+                } else {
+                    el.classList.remove('input-error');
+                }
+            });
+            ['estado-search-button-empleado', 'municipio-search-button-empleado'].forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 if (activo) {
@@ -2961,6 +3058,9 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             document.getElementById('custom-genero-button-emp')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none');
             document.getElementById('estado_id-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'input-error');
             document.getElementById('municipio_id-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'input-error');
+            document.getElementById('estado-search-button-empleado')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none', 'loading-input');
+            document.getElementById('municipio-search-button-empleado')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none', 'loading-input');
+            document.getElementById('institucion-search-button-empleado')?.classList.remove('input-success', 'input-error', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'ciudadano-campo-protegido', 'ciudadano-campo-na-editable', 'pointer-events-none', 'loading-input');
             document.getElementById('ciudadano_email-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'input-error');
             document.getElementById('direccion-empleado')?.classList.remove('input-success', 'campos-desde-ciudadano', 'ciudadano-dato-alterado', 'input-error');
             ['nombres-empleado', 'apellidos-empleado', 'cedula-tipo-empleado', 'cedula-numero-empleado', 'telefono-codigo-empleado', 'telefono-numero-empleado', 'institucion-empleado', 'institucion-otro-empleado', 'area_id-empleado'].forEach(id => {
@@ -3019,10 +3119,10 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const cc = document.getElementById('campos-contenido-empleado');
             if (cc) cc.innerHTML = '';
             populateMunicipiosEmpleado(document.getElementById('estado_id-empleado')?.value || '');
-            if (typeof window.cneSelect2NuevaSolicitudInit === 'function') {
-                window.cneSelect2NuevaSolicitudInit('empleado');
-                document.getElementById('institucion-empleado')?.dispatchEvent(new Event('change'));
+            if (typeof window.cneNuevaSolicitudCombosSyncInstitucionBoton === 'function') {
+                window.cneNuevaSolicitudCombosSyncInstitucionBoton();
             }
+            document.getElementById('institucion-empleado')?.dispatchEvent(new Event('change'));
             const ts = document.getElementById('tipo_solicitud-empleado');
             if (ts) ts.value = 'normal';
             tipoSolicitudActualEmp = 'normal';
