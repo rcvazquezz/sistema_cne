@@ -1,0 +1,3 @@
+/vendor/
+config/realtime.local.php
+error_websocket.log

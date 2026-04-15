@@ -1,0 +1,95 @@
+/**
+ * Presentación en mayúsculas de datos de ciudadanos (solo visual; no altera BD).
+ */
+
+/* Tablas estándar: columna 1 = cédula/ID, 2 = nombre ciudadano (historial empleado, mis solicitudes entrada) */
+table.cne-tabla-ciudadano-mayus > tbody > tr > td:nth-child(1),
+table.cne-tabla-ciudadano-mayus > tbody > tr > td:nth-child(2) {
+    text-transform: uppercase;
+}
+
+/* Coordinador — trámites del área: col 2 cédula, col 3 ciudadano */
+table.cne-tabla-tramites-coord > tbody > tr > td:nth-child(2),
+table.cne-tabla-tramites-coord > tbody > tr > td:nth-child(3) {
+    text-transform: uppercase;
+}
+
+/* Director — buscar trámite: cols 3–5 ciudadano, cédula, género */
+table.cne-tabla-ciudadano-mayus-dir-buscar > tbody > tr > td:nth-child(3),
+table.cne-tabla-ciudadano-mayus-dir-buscar > tbody > tr > td:nth-child(4),
+table.cne-tabla-ciudadano-mayus-dir-buscar > tbody > tr > td:nth-child(5) {
+    text-transform: uppercase;
+}
+
+/* Director — últimos registros: col 2 ciudadano */
+table.cne-tabla-ciudadano-mayus-dir-recientes > tbody > tr > td:nth-child(2) {
+    text-transform: uppercase;
+}
+
+.cne-dato-ciudadano,
+.cne-bloque-datos-ciudadano .cne-dato-ciudadano {
+    text-transform: uppercase;
+}
+
+/* Modal gestión empleado */
+#modal-datos.cne-bloque-datos-ciudadano > div:nth-child(2) p.font-semibold,
+#modal-datos.cne-bloque-datos-ciudadano > div:nth-child(3) p.font-mono {
+    text-transform: uppercase;
+}
+
+#confirm-details-emp.cne-bloque-datos-ciudadano .font-semibold,
+#confirm-completado-details-emp.cne-bloque-datos-ciudadano .font-semibold {
+    text-transform: uppercase;
+}
+
+#custom-genero-button-emp .selected-content,
+#custom-genero-button .selected-content {
+    text-transform: uppercase;
+}
+
+/* Formularios nueva solicitud / admin ciudadano */
+#nombres-empleado,
+#apellidos-empleado,
+#direccion-empleado,
+#institucion-otro-empleado,
+#nombres,
+#apellidos,
+#direccion,
+#institucion-otro,
+#ciudadano-nombres,
+#ciudadano-apellidos,
+#edit-ciudadano-nombres,
+#edit-ciudadano-apellidos,
+#ciudadano-direccion,
+#edit-ciudadano-direccion {
+    text-transform: uppercase;
+}
+
+#estado_id-empleado,
+#municipio_id-empleado,
+#institucion-empleado,
+#estado_id,
+#municipio_id,
+#institucion,
+#ciudadano-genero,
+#ciudadano-estado,
+#ciudadano-municipio,
+#edit-ciudadano-genero,
+#edit-ciudadano-estado,
+#edit-ciudadano-municipio {
+    text-transform: uppercase;
+}
+
+/* Coordinador — detalle modal: ciudadano y cédula (3.er y 4.º bloque del grid) */
+#modal-detalle-body .grid > div:nth-child(3) p.font-semibold,
+#modal-detalle-body .grid > div:nth-child(4) p.font-mono {
+    text-transform: uppercase;
+}
+
+/* Admin — listado ciudadanos: cédula, nombres, apellidos, dirección */
+table.cne-tabla-admin-ciudadanos > tbody > tr > td:nth-child(1),
+table.cne-tabla-admin-ciudadanos > tbody > tr > td:nth-child(2),
+table.cne-tabla-admin-ciudadanos > tbody > tr > td:nth-child(3),
+table.cne-tabla-admin-ciudadanos > tbody > tr > td:nth-child(7) {
+    text-transform: uppercase;
+}

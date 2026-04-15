@@ -1,0 +1,91 @@
+/**
+ * Select2 alineado con inputs Tailwind (rounded-lg, borde gris, altura ~48px).
+ * Alcance: sección Nueva Solicitud.
+ */
+
+/* Evitar que el dropdown quede detrás de sidebars, headers u otros stacking contexts */
+#seccion-nueva-solicitud .select2-container {
+    font-size: 14px;
+    line-height: 1.5;
+    display: block;
+    position: relative;
+    z-index: 9050;
+}
+
+#seccion-nueva-solicitud .select2-container.select2-container--open {
+    z-index: 9060;
+}
+
+/* Dropdown portado a seccion-nueva-solicitud (dropdownParent) */
+#seccion-nueva-solicitud .select2-dropdown.cne-select2-ns-dropdown {
+    z-index: 9070;
+}
+
+#seccion-nueva-solicitud .select2-container--default .select2-selection--single {
+    border: 2px solid #d1d5db;
+    border-radius: 0.5rem;
+    min-height: 48px;
+    padding: 6px 2px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#seccion-nueva-solicitud .select2-container--default.select2-container--disabled .select2-selection--single {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+#seccion-nueva-solicitud .select2-container--default.select2-container--focus .select2-selection--single,
+#seccion-nueva-solicitud .select2-container--default.select2-container--open .select2-selection--single {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    outline: none;
+}
+
+#seccion-nueva-solicitud .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 1.5;
+    padding-left: 0.75rem;
+    padding-right: 2rem;
+    color: #111827;
+}
+
+#seccion-nueva-solicitud .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 44px;
+    right: 8px;
+}
+
+#seccion-nueva-solicitud .select2-container--default .select2-selection--single .select2-selection__placeholder {
+    color: #6b7280;
+}
+
+/* Resultados y selección en mayúsculas (contenido ya transformado en JS) */
+#seccion-nueva-solicitud .cne-select2-ns-mayus {
+    font-weight: 400;
+}
+
+/* Dropdown */
+.select2-dropdown.cne-select2-ns-dropdown {
+    border: 2px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 14px;
+}
+
+.select2-container--open .select2-dropdown.cne-select2-ns-dropdown {
+    border-color: #3b82f6;
+}
+
+.select2-search--dropdown .select2-search__field {
+    border: 2px solid #d1d5db !important;
+    border-radius: 0.375rem !important;
+    padding: 8px 10px !important;
+    font-size: 14px !important;
+}
+
+.select2-results__option {
+    padding: 8px 12px;
+}
+
+.select2-results__option--highlighted.select2-results__option--selectable {
+    background-color: #eff6ff;
+    color: #111827;
+}

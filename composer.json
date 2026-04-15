@@ -1,0 +1,12 @@
+{
+    "name": "cne/sistema",
+    "description": "Sistema CNE — tiempo real vía SSE",
+    "require": {
+        "php": ">=8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cne\\": "src/"
+        }
+    }
+}
