@@ -22,7 +22,8 @@ if ($accion !== 'iniciar' && strlen($observaciones) < 5) {
 }
 try {
     $db = getDB();
-    $usuario = obtenerUsuario($_SESSION['user_id']);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuario = cneObtenerUsuarioContextoSesion($_SESSION['user_id']);
     $mi_coordinacion_id = $usuario['coordinacion_id'] ?? null;
     if (!$mi_coordinacion_id) {
         echo json_encode(['success' => false, 'message' => 'Coordinación del usuario no definida'], JSON_UNESCAPED_UNICODE);

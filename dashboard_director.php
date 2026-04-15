@@ -12,6 +12,8 @@ $usuario_id = $_SESSION['user_id'];
 limpiarSesionesExpiradas();
 actualizarSesionUltimaActividad($usuario_id);
 $usuario = obtenerUsuario($usuario_id);
+require_once __DIR__ . '/includes/cne_admin_view_context.php';
+cneAplicarContextoAdminView($usuario);
 $coordinacion_nombre = $usuario['coordinacion_nombre'] ?? ($_SESSION['coordinacion_nombre'] ?? null);
 $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['coordinacion_id'] ?? null);
 $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
@@ -119,6 +121,11 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
     </style>
 </head>
 <body class="font-sans antialiased bg-gray-50">
+    <?php if (!empty($_SESSION['is_admin_viewing'])): ?>
+    <a href="auth/admin_exit_view.php" class="fixed bottom-4 right-4 z-[100] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-lg hover:bg-indigo-700 border border-indigo-400/40 transition-colors" title="Restaurar sesión de administrador">
+        <i class="fas fa-arrow-left"></i> Volver a Admin
+    </a>
+    <?php endif; ?>
     <div class="menu-overlay" id="menu-overlay"></div>
     <div class="flex layout-shell w-full min-h-screen min-w-0">
         <aside class="sidebar bg-gray-800 text-white flex flex-col mobile-hidden" id="sidebar">

@@ -25,7 +25,8 @@ if ($tipo_solicitud !== 'inmediato' && $tipo_solicitud !== 'normal') {
 
 $mi_coord_tramite_inmediato = null;
 if ($tipo_solicitud === 'inmediato') {
-    $usuarioRowInm = obtenerUsuario($_SESSION['user_id']);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuarioRowInm = cneObtenerUsuarioContextoSesion($_SESSION['user_id']);
     $mi_coord_tramite_inmediato = (int) ($usuarioRowInm['coordinacion_id'] ?? $_SESSION['coordinacion_id'] ?? 0);
     if ($mi_coord_tramite_inmediato < 1) {
         echo json_encode(['success' => false, 'message' => 'Su usuario no tiene coordinación asignada; no puede registrar trámites inmediatos.'], JSON_UNESCAPED_UNICODE);

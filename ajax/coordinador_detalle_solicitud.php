@@ -17,7 +17,8 @@ if (!$solicitud_id) {
 
 try {
     $db = getDB();
-    $usuario = obtenerUsuario($_SESSION['user_id']);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuario = cneObtenerUsuarioContextoSesion($_SESSION['user_id']);
     $cid = (int)($usuario['coordinacion_id'] ?? 0);
     if (!$cid) {
         echo json_encode(['success' => false, 'message' => 'Coordinación no definida']);
@@ -37,6 +38,8 @@ try {
         SELECT s.*, c.ciudadano_identificacion, c.ciudadano_nombres, c.ciudadano_apellidos, c.ciudadano_telefono,
                t.tramite_nombre, ue.user_nombres as emp_nombres, ue.user_apellidos as emp_apellidos,
                ue.rol_id as emp_rol_id,
+               uc.user_nombres as creador_nombres, uc.user_apellidos as creador_apellidos,
+               uc.rol_id as creador_rol_id,
                ur.user_nombres as redir_nombres, ur.user_apellidos as redir_apellidos,
                CASE
                    WHEN COALESCE(au.coord_destino, $coordSelect) <> :cid AND au.coord_destino IS NOT NULL
@@ -47,6 +50,7 @@ try {
         JOIN ciudadanos c ON s.ciudadano_identificacion = c.ciudadano_identificacion
         JOIN tramite t ON s.tramite_id = t.tramite_id
         LEFT JOIN usuarios ue ON s.empleado_asignado_id = ue.user_identificacion
+        LEFT JOIN usuarios uc ON s.created_by = uc.user_identificacion
         LEFT JOIN (
             SELECT a.solicitud_id, c2.coordinacion_id AS coord_destino, a.empleado_id AS redirigido_por_id
             FROM auditoria a
@@ -82,13 +86,22 @@ try {
     $redirNom = trim(($s['redir_nombres'] ?? '') . ' ' . ($s['redir_apellidos'] ?? ''));
     $asigNom = trim(($s['emp_nombres'] ?? '') . ' ' . ($s['emp_apellidos'] ?? ''));
     $asigRolId = (int)($s['emp_rol_id'] ?? 0);
+    $creaNom = trim(($s['creador_nombres'] ?? '') . ' ' . ($s['creador_apellidos'] ?? ''));
+    $creaRolId = (int)($s['creador_rol_id'] ?? 0);
+    $sufijoOac = ' (Atención al Cliente)';
     if ($esRedirigida && !empty($redirNom)) {
         $s['empleado_nombre'] = $redirNom;
     } elseif (!$esRedirigida) {
-        if (empty($asigNom) || $asigRolId === 1) {
-            $s['empleado_nombre'] = 'Sin asignar';
-        } else {
+        if (!empty($asigNom) && $asigRolId !== 1) {
             $s['empleado_nombre'] = $asigNom;
+        } elseif (!empty($asigNom) && $asigRolId === 1) {
+            $s['empleado_nombre'] = $asigNom . $sufijoOac;
+        } elseif (empty($asigNom) && $creaRolId === 1 && $creaNom !== '') {
+            $s['empleado_nombre'] = $creaNom . $sufijoOac;
+        } elseif (empty($asigNom) && $creaNom !== '') {
+            $s['empleado_nombre'] = $creaNom;
+        } else {
+            $s['empleado_nombre'] = 'Sin asignar';
         }
     } else {
         $s['empleado_nombre'] = 'Sin asignar';

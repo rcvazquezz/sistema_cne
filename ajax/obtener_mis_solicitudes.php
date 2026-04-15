@@ -2,13 +2,15 @@
 session_start();
 require_once '../config/database.php';
 
-// Verificar autenticación
-if (!isset($_SESSION['user_id'])) {
+// Verificar autenticación (Atención al Ciudadano)
+if (!isset($_SESSION['user_id']) || (int) ($_SESSION['rol_id'] ?? 0) !== 1) {
     echo '<tr><td colspan="7" class="text-center py-4 text-red-500">No autorizado</td></tr>';
     exit;
 }
 
 $usuario_id = $_SESSION['user_id'];
+$adminView = !empty($_SESSION['is_admin_viewing']);
+$coordScopeAdmin = (int) ($_SESSION['admin_view_coordinacion_id'] ?? $_SESSION['coordinacion_id'] ?? 0);
 
 // Obtener filtros
 $filtro_cedula = $_GET['cedula'] ?? '';
@@ -42,10 +44,24 @@ try {
         JOIN coordinacion co ON t.coordinacion_id = co.coordinacion_id
         LEFT JOIN institucion i ON c.institucion_id = i.institucion_id
         " . ($esFiltroVencida ? trim(cneSqlJoinRecibidoCaracasPorSolicitud($db)) : '') . "
-        WHERE s.created_by = :usuario_id
     ";
-    
-    $params = [':usuario_id' => $usuario_id];
+    if ($adminView) {
+        $cid = $coordScopeAdmin;
+        if ($cid < 1) {
+            $rowOac = $db->query("SELECT coordinacion_id FROM coordinacion WHERE coordinacion_estado = 'activo' AND coordinacion_nombre LIKE '%Atención al Ciudadano%' ORDER BY coordinacion_id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+            $cid = $rowOac ? (int) $rowOac['coordinacion_id'] : 0;
+        }
+        if ($cid > 0) {
+            $sql .= " WHERE t.coordinacion_id = :coord_scope";
+            $params = [':coord_scope' => $cid];
+        } else {
+            $sql .= " WHERE s.created_by = :usuario_id";
+            $params = [':usuario_id' => $usuario_id];
+        }
+    } else {
+        $sql .= " WHERE s.created_by = :usuario_id";
+        $params = [':usuario_id' => $usuario_id];
+    }
     
     if ($filtro_cedula) {
         $sql .= " AND c.ciudadano_identificacion LIKE :cedula";

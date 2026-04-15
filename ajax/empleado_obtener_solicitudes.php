@@ -13,7 +13,8 @@ $usuario_id = $_SESSION['user_id'];
 
 try {
     $db = getDB();
-    $usuario = obtenerUsuario($usuario_id);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuario = cneObtenerUsuarioContextoSesion($usuario_id);
     $coordinacion_id = $usuario['coordinacion_id'] ?? null;
     if (!$coordinacion_id) {
         echo json_encode(['success' => false, 'message' => 'Coordinación no definida para el usuario']);

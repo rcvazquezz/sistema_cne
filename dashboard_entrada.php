@@ -15,6 +15,8 @@ actualizarSesionUltimaActividad($usuario_id);
 
 // Obtener datos completos del usuario (incluye coordinación)
 $usuario = obtenerUsuario($usuario_id);
+require_once __DIR__ . '/includes/cne_admin_view_context.php';
+cneAplicarContextoAdminView($usuario);
 $coordinacion_nombre = $usuario['coordinacion_nombre'] ?? ($_SESSION['coordinacion_nombre'] ?? '');
 $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id'] ?? null);
 $CNE_RT = ['dashboard' => 'entrada', 'coord' => (int) ($coordinacion_id ?? 0)];
@@ -928,6 +930,11 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
+    <?php if (!empty($_SESSION['is_admin_viewing'])): ?>
+    <a href="auth/admin_exit_view.php" class="fixed bottom-4 right-4 z-[100] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-lg hover:bg-indigo-700 border border-indigo-400/40 transition-colors" title="Restaurar sesión de administrador">
+        <i class="fas fa-arrow-left"></i> Volver a Admin
+    </a>
+    <?php endif; ?>
     <!-- Overlay para menú móvil -->
     <div class="menu-overlay" id="menu-overlay"></div>
     

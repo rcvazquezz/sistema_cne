@@ -11,6 +11,21 @@ $usuario_id = $_SESSION['user_id'];
 limpiarSesionesExpiradas();
 actualizarSesionUltimaActividad($usuario_id);
 $usuario = obtenerUsuario($usuario_id);
+$db = getDB();
+/** Solo estas áreas en el modal Pantallas (Funcionario / Coordinador); se excluye la Oficina de Atención al Ciudadano. */
+$nombresPantallasAdmin = ['COPAFI', 'Registro Civil', 'Registro Electoral', 'Secretaría'];
+$phPantallas = implode(',', array_fill(0, count($nombresPantallasAdmin), '?'));
+$stmtPantallas = $db->prepare("
+    SELECT coordinacion_id AS id, coordinacion_nombre AS nombre
+    FROM coordinacion
+    WHERE coordinacion_estado = 'activo'
+      AND coordinacion_nombre NOT LIKE '%Atención al Ciudadano%'
+      AND coordinacion_nombre NOT LIKE '%Oficina de Atención%'
+      AND coordinacion_nombre IN ($phPantallas)
+    ORDER BY FIELD(coordinacion_nombre, 'COPAFI', 'Registro Civil', 'Registro Electoral', 'Secretaría')
+");
+$stmtPantallas->execute($nombresPantallasAdmin);
+$coordinaciones_pantallas_admin = $stmtPantallas->fetchAll(PDO::FETCH_ASSOC);
 $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id'] ?? 0)];
 ?>
 <!DOCTYPE html>
@@ -122,6 +137,10 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     <li class="menu-item cursor-pointer py-4 px-6 flex items-center gap-3 border-l-4 border-transparent transition-all" data-section="buscar-solicitudes">
                         <i class="fas fa-search w-5 text-center"></i>
                         <span>Buscar Solicitudes</span>
+                    </li>
+                    <li class="menu-item cursor-pointer py-4 px-6 flex items-center gap-3 border-l-4 border-transparent transition-all" data-section="pantallas">
+                        <i class="fas fa-desktop w-5 text-center"></i>
+                        <span>Pantallas</span>
                     </li>
                     <li class="menu-item cursor-pointer py-4 px-6 flex items-center gap-3 border-l-4 border-transparent transition-all" data-section="respaldos">
                         <i class="fas fa-file-export w-5 text-center"></i>
@@ -364,7 +383,62 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 </div>
             </section>
 
-
+            <!-- Sección Pantallas (supervisión de roles) -->
+            <section class="section hidden p-4 md:p-6" id="seccion-pantallas">
+                <div class="max-w-7xl mx-auto w-full">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 md:p-6 shadow mb-6 border border-blue-100">
+                        <h2 class="text-gray-800 text-lg md:text-xl font-semibold mb-1 flex items-center gap-3">
+                            <i class="fas fa-desktop text-blue-600"></i>
+                            <span>Supervisión de Pantallas</span>
+                        </h2>
+                        <p class="text-sm text-gray-600">Abra cada vista con los mismos permisos que el rol. Para Funcionario y Coordinador elija el área (coordinación).</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col gap-4">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="badge-atencion text-xs sm:text-sm"><i class="fas fa-headset mr-1"></i> Rol 1</span>
+                                <h3 class="text-lg font-semibold text-gray-800">Atención al Ciudadano</h3>
+                            </div>
+                            <p class="text-sm text-gray-600 flex-1">Ventanilla, nueva solicitud y seguimiento ciudadano.</p>
+                            <form method="post" action="auth/admin_view_as.php">
+                                <input type="hidden" name="role_id" value="1">
+                                <button type="submit" class="w-full py-3 rounded-lg bg-cyan-600 text-white font-semibold hover:bg-cyan-700 transition-colors shadow-sm">Entrar a la pantalla</button>
+                            </form>
+                        </div>
+                        <div class="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col gap-4">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="badge-empleado text-xs sm:text-sm"><i class="fas fa-user-tie mr-1"></i> Rol 2</span>
+                                <h3 class="text-lg font-semibold text-gray-800">Funcionario</h3>
+                            </div>
+                            <p class="text-sm text-gray-600 flex-1">Gestión de trámites y solicitudes del área seleccionada.</p>
+                            <button type="button" id="btn-pantalla-funcionario" class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors shadow-sm">Entrar a la pantalla</button>
+                        </div>
+                        <div class="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col gap-4">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="badge-coordinador text-xs sm:text-sm"><i class="fas fa-user-shield mr-1"></i> Rol 3</span>
+                                <h3 class="text-lg font-semibold text-gray-800">Coordinador</h3>
+                            </div>
+                            <p class="text-sm text-gray-600 flex-1">Supervisión, reportes y métricas del área elegida.</p>
+                            <button type="button" id="btn-pantalla-coordinador" class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors shadow-sm">Entrar a la pantalla</button>
+                        </div>
+                        <div class="bg-white rounded-xl p-6 shadow border border-gray-100 flex flex-col gap-4">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="badge-director text-xs sm:text-sm"><i class="fas fa-chart-line mr-1"></i> Rol 4</span>
+                                <h3 class="text-lg font-semibold text-gray-800">Director</h3>
+                            </div>
+                            <p class="text-sm text-gray-600 flex-1">Panel estratégico y reportes globales.</p>
+                            <form method="post" action="auth/admin_view_as.php">
+                                <input type="hidden" name="role_id" value="4">
+                                <button type="submit" class="w-full py-3 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-colors shadow-sm">Entrar a la pantalla</button>
+                            </form>
+                        </div>
+                    </div>
+                    <form id="form-admin-view-as-area" method="post" action="auth/admin_view_as.php" class="hidden">
+                        <input type="hidden" name="role_id" id="pantalla-role-id" value="">
+                        <input type="hidden" name="coordinacion_id" id="pantalla-coord-id" value="">
+                    </form>
+                </div>
+            </section>
 
             <!-- Sección Respaldos -->
             <section class="section hidden p-4 md:p-6" id="seccion-respaldos">
@@ -430,6 +504,29 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 </div>
             </section>
         </main>
+
+        <!-- Modal: elegir área (Funcionario / Coordinador) -->
+        <div id="modal-pantallas-area" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-pantallas-titulo">
+            <div class="modal-content max-w-md w-full mx-4">
+                <div class="px-6 py-4 border-b border-gray-100 relative shrink-0">
+                    <h3 id="modal-pantallas-titulo" class="text-lg font-semibold text-gray-800 text-center pr-8">Seleccionar área</h3>
+                    <button type="button" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1.5 rounded-lg hover:bg-gray-100" onclick="cerrarModalPantallaArea()" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-6 sm:p-8 max-h-[70vh] overflow-y-auto custom-scrollbar flex flex-col items-center">
+                    <p class="text-sm text-gray-600 mb-6 text-center max-w-sm leading-relaxed">Elija una de las coordinaciones disponibles para cargar datos y permisos de esa área.</p>
+                    <div class="flex flex-col gap-3 w-full max-w-sm mx-auto" id="lista-areas-pantallas-btns">
+                        <?php foreach ($coordinaciones_pantallas_admin as $c): ?>
+                        <button type="button" class="w-full text-center px-4 py-3.5 rounded-xl border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 font-semibold text-gray-800 shadow-sm transition-colors" data-coord-id="<?php echo (int) $c['id']; ?>">
+                            <?php echo htmlspecialchars($c['nombre']); ?>
+                        </button>
+                        <?php endforeach; ?>
+                        <?php if (count($coordinaciones_pantallas_admin) === 0): ?>
+                        <p class="text-sm text-amber-700 text-center py-4 px-2">No hay coordinaciones configuradas con los nombres esperados (COPAFI, Registro Civil, Registro Electoral, Secretaría). Revise la tabla <span class="font-mono text-xs">coordinacion</span>.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Modal seguimiento (timeline) -->
         <div id="modal-seguimiento-admin" class="fixed inset-0 z-[70] hidden items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -908,8 +1005,8 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
         setInterval(fetchNotificacionesAdmin, 60000);
         fetchNotificacionesAdmin();
 
-        const sectionTitles = { usuarios: 'Gestión de Usuarios', catalogos: 'Gestión de Catálogos', ciudadanos: 'Gestión de Ciudadanos', 'buscar-solicitudes': 'Buscar Solicitudes', respaldos: 'Respaldo de Base de Datos' };
-        const sections = { usuarios: document.getElementById('seccion-usuarios'), catalogos: document.getElementById('seccion-catalogos'), ciudadanos: document.getElementById('seccion-ciudadanos'), 'buscar-solicitudes': document.getElementById('seccion-buscar-solicitudes'), respaldos: document.getElementById('seccion-respaldos') };
+        const sectionTitles = { usuarios: 'Gestión de Usuarios', catalogos: 'Gestión de Catálogos', ciudadanos: 'Gestión de Ciudadanos', 'buscar-solicitudes': 'Buscar Solicitudes', pantallas: 'Supervisión de Pantallas', respaldos: 'Respaldo de Base de Datos' };
+        const sections = { usuarios: document.getElementById('seccion-usuarios'), catalogos: document.getElementById('seccion-catalogos'), ciudadanos: document.getElementById('seccion-ciudadanos'), 'buscar-solicitudes': document.getElementById('seccion-buscar-solicitudes'), pantallas: document.getElementById('seccion-pantallas'), respaldos: document.getElementById('seccion-respaldos') };
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', function() {
                 const s = this.dataset.section;
@@ -927,6 +1024,31 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 if (s === 'buscar-solicitudes') inicializarVistaBuscarSolicitudesAdmin();
                 if (s === 'respaldos') { cargarConfigBackup(); cargarHistorialBackup(); }
                 if (window.innerWidth < 1024) { sidebar.classList.remove('mobile-visible'); sidebar.classList.add('mobile-hidden'); overlay?.classList.remove('active'); }
+            });
+        });
+
+        let pantallaRoleAreaPendiente = null;
+        function abrirModalPantallaArea(roleId) {
+            pantallaRoleAreaPendiente = roleId;
+            document.getElementById('modal-pantallas-area')?.classList.add('active');
+        }
+        function cerrarModalPantallaArea() {
+            pantallaRoleAreaPendiente = null;
+            document.getElementById('modal-pantallas-area')?.classList.remove('active');
+        }
+        document.getElementById('btn-pantalla-funcionario')?.addEventListener('click', () => abrirModalPantallaArea(2));
+        document.getElementById('btn-pantalla-coordinador')?.addEventListener('click', () => abrirModalPantallaArea(3));
+        document.getElementById('modal-pantallas-area')?.addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalPantallaArea();
+        });
+        document.querySelectorAll('#lista-areas-pantallas-btns button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const coordId = this.getAttribute('data-coord-id');
+                const roleId = pantallaRoleAreaPendiente;
+                if (!coordId || !roleId) return;
+                document.getElementById('pantalla-role-id').value = String(roleId);
+                document.getElementById('pantalla-coord-id').value = coordId;
+                document.getElementById('form-admin-view-as-area').submit();
             });
         });
 

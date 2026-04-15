@@ -11,7 +11,8 @@ if (!isset($_SESSION['user_id']) || (int)($_SESSION['rol_id'] ?? 0) !== 3) {
 
 try {
     $db = getDB();
-    $usuario = obtenerUsuario($_SESSION['user_id']);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuario = cneObtenerUsuarioContextoSesion($_SESSION['user_id']);
     $cid = (int)($usuario['coordinacion_id'] ?? 0);
     if (!$cid) {
         echo json_encode(['success' => false, 'message' => 'Coordinación no definida']);
@@ -47,14 +48,8 @@ try {
                t.tramite_nombre,
                u_asig.user_nombres as emp_nombres, u_asig.user_apellidos as emp_apellidos,
                u_asig.rol_id as emp_rol_id,
+               u_crea.user_nombres as creador_nombres, u_crea.user_apellidos as creador_apellidos,
                u_crea.rol_id as creador_rol_id,
-               CASE
-                   WHEN s.solicitud_estado = 'pendiente' AND s.empleado_asignado_id IS NULL AND u_crea.rol_id = 1
-                   THEN 'Atención al cliente'
-                   WHEN u_asig.user_nombres IS NULL OR u_asig.user_apellidos IS NULL
-                   THEN 'Sin asignar'
-                   ELSE CONCAT(u_asig.user_nombres, ' ', u_asig.user_apellidos)
-               END AS empleado_nombre_sql,
                u_redir.user_nombres as redir_nombres, u_redir.user_apellidos as redir_apellidos,
                au.redirigido_por_id
         FROM solicitudes s
@@ -151,19 +146,20 @@ try {
         $asigNom = trim(($s['emp_nombres'] ?? '') . ' ' . ($s['emp_apellidos'] ?? ''));
         $asigRolId = (int)($s['emp_rol_id'] ?? 0);
         $creadorRolId = (int)($s['creador_rol_id'] ?? 0);
-        $empleadoNombreSql = trim((string)($s['empleado_nombre_sql'] ?? ''));
+        $creadorNom = trim(($s['creador_nombres'] ?? '') . ' ' . ($s['creador_apellidos'] ?? ''));
+        $sufijoOac = ' (Atención al Cliente)';
         // Coordinación de Origen (quien envía): si es redirigida, mostrar el usuario que ejecutó la redirección
         if ($esRedirigida && !empty($redirNom)) {
             $s['empleado_nombre'] = $redirNom;
         } elseif (!$esRedirigida) {
-            // Pendiente sin dueño creado desde Atención al Ciudadano: mostrar origen.
-            if (($estado === 'pendiente') && empty($asigNom) && $creadorRolId === 1) {
-                $s['empleado_nombre'] = 'Atención al cliente';
-            } elseif (!empty($asigNom) && $asigRolId !== 1) {
-                // Al iniciar/completar/gestionar, prevalece el funcionario responsable.
+            if (!empty($asigNom) && $asigRolId !== 1) {
                 $s['empleado_nombre'] = $asigNom;
-            } elseif ($empleadoNombreSql !== '') {
-                $s['empleado_nombre'] = $empleadoNombreSql;
+            } elseif (!empty($asigNom) && $asigRolId === 1) {
+                $s['empleado_nombre'] = $asigNom . $sufijoOac;
+            } elseif (empty($asigNom) && $creadorRolId === 1 && $creadorNom !== '') {
+                $s['empleado_nombre'] = $creadorNom . $sufijoOac;
+            } elseif (empty($asigNom) && $creadorNom !== '') {
+                $s['empleado_nombre'] = $creadorNom;
             } else {
                 $s['empleado_nombre'] = 'Sin asignar';
             }

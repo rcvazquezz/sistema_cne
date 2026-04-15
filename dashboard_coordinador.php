@@ -12,6 +12,8 @@ $usuario_id = $_SESSION['user_id'];
 limpiarSesionesExpiradas();
 actualizarSesionUltimaActividad($usuario_id);
 $usuario = obtenerUsuario($usuario_id);
+require_once __DIR__ . '/includes/cne_admin_view_context.php';
+cneAplicarContextoAdminView($usuario);
 $coordinacion_nombre = $usuario['coordinacion_nombre'] ?? ($_SESSION['coordinacion_nombre'] ?? '');
 $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id'] ?? null);
 ?>
@@ -95,6 +97,11 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
     </style>
 </head>
 <body class="font-sans antialiased bg-gray-50">
+    <?php if (!empty($_SESSION['is_admin_viewing'])): ?>
+    <a href="auth/admin_exit_view.php" class="fixed bottom-4 right-4 z-[100] inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-lg hover:bg-indigo-700 border border-indigo-400/40 transition-colors" title="Restaurar sesión de administrador">
+        <i class="fas fa-arrow-left"></i> Volver a Admin
+    </a>
+    <?php endif; ?>
     <div class="menu-overlay" id="menu-overlay"></div>
     <div class="flex layout-shell w-full min-h-screen min-w-0">
         <aside class="sidebar bg-gray-800 text-white flex flex-col mobile-hidden" id="sidebar">
@@ -643,7 +650,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                 tbody.innerHTML = d.solicitudes.map(s => `
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${(s.empleado_nombre === 'Sin asignar' || s.empleado_nombre === 'Atención al cliente')
+                            ${(s.empleado_nombre === 'Sin asignar')
                                 ? `<span class="text-gray-400 italic">${s.empleado_nombre}</span>`
                                 : (s.empleado_nombre || '-')}
                         </td>
@@ -675,7 +682,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                             <div><p class="text-gray-500">Teléfono</p><p>${s.ciudadano_telefono || '-'}</p></div>
                             <div><p class="text-gray-500">Trámite</p><p>${s.tramite_nombre}</p></div>
                             <div><p class="text-gray-500">Empleado asignado</p><p>
-                                ${(s.empleado_nombre === 'Sin asignar' || s.empleado_nombre === 'Atención al cliente')
+                                ${(s.empleado_nombre === 'Sin asignar')
                                     ? `<span class="text-gray-400 italic">${s.empleado_nombre}</span>`
                                     : (s.empleado_nombre || '-')}
                             </p></div>

@@ -12,7 +12,8 @@ if (!isset($_SESSION['user_id']) || (int)($_SESSION['rol_id'] ?? 0) !== 2) {
 try {
     $db = getDB();
     $usuario_id = $_SESSION['user_id'];
-    $usuario = obtenerUsuario($usuario_id);
+    require_once __DIR__ . '/../includes/cne_admin_view_context.php';
+    $usuario = cneObtenerUsuarioContextoSesion($usuario_id);
     $coordinacion_id = $usuario['coordinacion_id'] ?? null;
     if (!$coordinacion_id) {
         echo json_encode(['success' => false, 'message' => 'Coordinación no definida']);
