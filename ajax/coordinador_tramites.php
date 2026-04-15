@@ -35,7 +35,9 @@ try {
         $hasCoordActual = (bool)$chk->fetchColumn();
     } catch (Exception $e) {}
 
-    $coordExpr = $hasCoordActual ? "COALESCE(s.coordinacion_actual_id, t.coordinacion_id)" : "t.coordinacion_id";
+    $coordWhere = $hasCoordActual
+        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
+        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
     $sql = "
         SELECT s.solicitud_id, s.solicitud_numero, s.solicitud_fecha_solicitud as fecha_registro,
@@ -70,7 +72,7 @@ try {
         ) au ON au.solicitud_id = s.solicitud_id
         LEFT JOIN usuarios u_redir ON au.redirigido_por_id = u_redir.user_identificacion
         " . ($esFiltroVencida ? trim(cneSqlJoinRecibidoCaracasPorSolicitud($db)) : '') . "
-        WHERE $coordExpr = :cid
+        WHERE $coordWhere
     ";
     $params = [':cid' => $cid, ':cid_redir' => $cid];
 

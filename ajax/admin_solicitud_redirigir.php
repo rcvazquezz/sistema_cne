@@ -18,46 +18,6 @@ if ($solicitud_id < 1 || $destino < 1) {
     exit;
 }
 
-/**
- * @return int|null tramite_id en la coordinación destino
- */
-function admin_resolver_tramite_destino(PDO $db, int $solicitud_id, int $destCoordId): ?int
-{
-    $st = $db->prepare("
-        SELECT t.tramite_nombre
-        FROM solicitudes s
-        JOIN tramite t ON s.tramite_id = t.tramite_id
-        WHERE s.solicitud_id = :sid
-    ");
-    $st->execute([':sid' => $solicitud_id]);
-    $cur = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$cur) {
-        return null;
-    }
-    $nombre = $cur['tramite_nombre'];
-    $st2 = $db->prepare("
-        SELECT tramite_id FROM tramite
-        WHERE coordinacion_id = :cid AND tramite_nombre = :nom
-        ORDER BY (tramite_padre_id IS NULL) DESC
-        LIMIT 1
-    ");
-    $st2->execute([':cid' => $destCoordId, ':nom' => $nombre]);
-    $r = $st2->fetch(PDO::FETCH_ASSOC);
-    if ($r) {
-        return (int) $r['tramite_id'];
-    }
-    $st3 = $db->prepare("
-        SELECT tramite_id FROM tramite
-        WHERE coordinacion_id = :cid AND tramite_padre_id IS NULL
-        ORDER BY tramite_nombre ASC
-        LIMIT 1
-    ");
-    $st3->execute([':cid' => $destCoordId]);
-    $r3 = $st3->fetch(PDO::FETCH_ASSOC);
-
-    return $r3 ? (int) $r3['tramite_id'] : null;
-}
-
 try {
     $db = getDB();
 
@@ -85,7 +45,7 @@ try {
         exit;
     }
 
-    $nuevoTid = admin_resolver_tramite_destino($db, $solicitud_id, $destino);
+    $nuevoTid = cneResolverTramiteDestinoCoordinacion($db, $solicitud_id, $destino);
     if (!$nuevoTid) {
         echo json_encode(['success' => false, 'message' => 'La coordinación destino no tiene trámites configurados']);
         exit;

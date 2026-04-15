@@ -14,10 +14,16 @@ function cneAplicarContextoAdminView(array &$usuario): void
         $usuario['coordinacion_nombre'] = null;
         return;
     }
-    $cid = $_SESSION['admin_view_coordinacion_id'] ?? null;
+    $cid = $_SESSION['admin_view_coordinacion_id']
+        ?? $_SESSION['acoordinacion_id']
+        ?? $_SESSION['coordinacion_id']
+        ?? null;
     if ($cid !== null && $cid !== '') {
         $usuario['coordinacion_id'] = (int) $cid;
         $usuario['coordinacion_nombre'] = $_SESSION['admin_view_coordinacion_nombre'] ?? ($usuario['coordinacion_nombre'] ?? '');
+    } else {
+        // En vista admin nunca debemos caer a la coordinación original de BD por accidente.
+        $usuario['coordinacion_id'] = null;
     }
 }
 

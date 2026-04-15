@@ -31,7 +31,9 @@ try {
         $hasCoordActual = (bool)$chk->fetchColumn();
     } catch (Exception $e) {}
 
-    $coordExpr = $hasCoordActual ? "COALESCE(s.coordinacion_actual_id, t.coordinacion_id)" : "t.coordinacion_id";
+    $coordWhere = $hasCoordActual
+        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
+        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
 
     $stmt = $db->prepare("
@@ -63,7 +65,7 @@ try {
             )
         ) au ON au.solicitud_id = s.solicitud_id
         LEFT JOIN usuarios ur ON au.redirigido_por_id = ur.user_identificacion
-        WHERE s.solicitud_id = :sid AND $coordExpr = :cid
+        WHERE s.solicitud_id = :sid AND $coordWhere
     ");
     $stmt->execute([':sid' => $solicitud_id, ':cid' => $cid]);
     $s = $stmt->fetch();

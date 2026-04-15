@@ -29,9 +29,18 @@ try {
         echo json_encode(['success' => false, 'message' => 'Coordinación del usuario no definida'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    $hasCoordActual = false;
+    try {
+        $chk = $db->query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'solicitudes' AND COLUMN_NAME = 'coordinacion_actual_id'");
+        $hasCoordActual = (bool) $chk->fetchColumn();
+    } catch (Exception $e) {
+    }
+    $coordExprAcceso = $hasCoordActual
+        ? 'COALESCE(s.coordinacion_actual_id, au.coord_destino, t.coordinacion_id)'
+        : 'COALESCE(au.coord_destino, t.coordinacion_id)';
     $stmt = $db->prepare("
         SELECT 
-            COALESCE(au.coord_destino, t.coordinacion_id) AS coord_actual,
+            {$coordExprAcceso} AS coord_actual,
             s.solicitud_estado
         FROM solicitudes s
         JOIN tramite t ON s.tramite_id = t.tramite_id
@@ -108,6 +117,30 @@ try {
             exit;
         }
     }
+    $nuevo_tramite_id_redirect = null;
+    $meta_redir_prefetch = null;
+    if ($accion === 'redirigir') {
+        $nuevo_tramite_id_redirect = cneResolverTramiteDestinoCoordinacion($db, $solicitud_id, (int) $destino_coordinacion_id);
+        if (!$nuevo_tramite_id_redirect) {
+            echo json_encode(['success' => false, 'message' => 'La coordinación destino no tiene trámites configurados'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $stmtChkTid = $db->prepare("SELECT coordinacion_id FROM tramite WHERE tramite_id = :tid LIMIT 1");
+        $stmtChkTid->execute([':tid' => $nuevo_tramite_id_redirect]);
+        $coordDelNuevoTramite = (int) ($stmtChkTid->fetchColumn() ?: 0);
+        if ($coordDelNuevoTramite !== (int) $destino_coordinacion_id) {
+            echo json_encode(['success' => false, 'message' => 'No se pudo vincular el trámite con la coordinación destino'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $stmt = $db->prepare("
+            SELECT s.solicitud_numero, t.tramite_nombre, t.coordinacion_id AS coord_origen
+            FROM solicitudes s
+            JOIN tramite t ON s.tramite_id = t.tramite_id
+            WHERE s.solicitud_id = :sid
+        ");
+        $stmt->execute([':sid' => $solicitud_id]);
+        $meta_redir_prefetch = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     try {
         if ($accion === 'iniciar') {
             $stmt = $db->prepare("
@@ -124,6 +157,48 @@ try {
             if (!$ok) {
                 $err = $stmt->errorInfo();
                 throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar estado'));
+            }
+        } elseif ($accion === 'redirigir' && $nuevo_tramite_id_redirect) {
+            if ($hasCoordActual) {
+                $stmt = $db->prepare("
+                    UPDATE solicitudes SET
+                        tramite_id = :tid,
+                        solicitud_estado = :estado,
+                        empleado_asignado_id = NULL,
+                        codigo_interno = :codigo,
+                        solicitud_fecha_completada = :fecha,
+                        coordinacion_actual_id = :caid
+                    WHERE solicitud_id = :id
+                ");
+                $ok = $stmt->execute([
+                    ':tid' => $nuevo_tramite_id_redirect,
+                    ':estado' => $estado,
+                    ':codigo' => $codigo_interno ?: null,
+                    ':fecha' => $fecha_completada,
+                    ':caid' => (int) $destino_coordinacion_id,
+                    ':id' => $solicitud_id
+                ]);
+            } else {
+                $stmt = $db->prepare("
+                    UPDATE solicitudes SET
+                        tramite_id = :tid,
+                        solicitud_estado = :estado,
+                        empleado_asignado_id = NULL,
+                        codigo_interno = :codigo,
+                        solicitud_fecha_completada = :fecha
+                    WHERE solicitud_id = :id
+                ");
+                $ok = $stmt->execute([
+                    ':tid' => $nuevo_tramite_id_redirect,
+                    ':estado' => $estado,
+                    ':codigo' => $codigo_interno ?: null,
+                    ':fecha' => $fecha_completada,
+                    ':id' => $solicitud_id
+                ]);
+            }
+            if (!$ok) {
+                $err = $stmt->errorInfo();
+                throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar solicitud'));
             }
         } else {
             if ($accion === 'completar') {
@@ -168,20 +243,10 @@ try {
         exit;
     }
     if ($accion === 'redirigir' && $destino_coordinacion_id) {
-        $stmt = $db->prepare("
-            SELECT 
-                s.solicitud_numero,
-                t.tramite_nombre,
-                t.coordinacion_id AS coord_origen
-            FROM solicitudes s
-            JOIN tramite t ON s.tramite_id = t.tramite_id
-            WHERE s.solicitud_id = :sid
-        ");
-        $stmt->execute([':sid' => $solicitud_id]);
-        $meta = $stmt->fetch();
+        $meta = is_array($meta_redir_prefetch) ? $meta_redir_prefetch : [];
         $numero = $meta['solicitud_numero'] ?? '';
         $tramiteNom = $meta['tramite_nombre'] ?? '';
-        $coordOrigenId = (int)($meta['coord_origen'] ?? 0);
+        $coordOrigenId = (int) ($meta['coord_origen'] ?? 0);
         $origenNombre = '';
         if ($coordOrigenId) {
             $stmt = $db->prepare("SELECT coordinacion_nombre FROM coordinacion WHERE coordinacion_id = :cid");

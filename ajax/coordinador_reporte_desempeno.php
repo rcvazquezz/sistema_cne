@@ -36,7 +36,9 @@ try {
     } catch (Exception $e) {
     }
 
-    $coordExpr = $hasCoordActual ? "COALESCE(s.coordinacion_actual_id, t.coordinacion_id)" : "t.coordinacion_id";
+    $coordWhere = $hasCoordActual
+        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
+        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
     $auSubquery = "
         LEFT JOIN (
@@ -50,7 +52,7 @@ try {
             )
         ) au ON au.solicitud_id = s.solicitud_id
     ";
-    $baseWhere = " WHERE $coordExpr = :cid";
+    $baseWhere = " WHERE $coordWhere";
     $params = [':cid' => $cid];
 
     if ($funcionario && $funcionario !== 'oficina_entrada') {
