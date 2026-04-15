@@ -2625,6 +2625,16 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             const errorDiv = document.getElementById('error-municipio');
             const visual = document.getElementById('municipio-search-button');
             if (!errorDiv || !select) return true;
+            const val = String(select.value || '').trim();
+            if (!val) {
+                if (visual) {
+                    visual.classList.remove('input-error', 'input-success');
+                } else {
+                    select.classList.remove('input-error', 'input-success');
+                }
+                errorDiv.classList.add('hidden');
+                return true;
+            }
             mostrarExito(visual || select, errorDiv);
             return true;
         }
@@ -3786,6 +3796,54 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             html += '</div>';
             container.innerHTML = html;
         }
+
+        function cneTextoLabelTramiteSearchButtonEntrada(buttonId) {
+            const btn = document.getElementById(buttonId);
+            const span = btn?.querySelector('.selected-tramite-text');
+            if (!span) return '';
+            if (span.classList.contains('tramite-placeholder')) return '';
+            return (span.textContent || '').trim();
+        }
+
+        function cneFmtMayusConfirmEntrada(s) {
+            if (s == null || s === '') return '';
+            return typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(String(s)) : String(s);
+        }
+
+        function cneConfirmacionTextoEstadoEntrada() {
+            const id = document.getElementById('estado_id')?.value;
+            const fromBtn = cneTextoLabelTramiteSearchButtonEntrada('estado-search-button');
+            if (fromBtn) return fromBtn;
+            if (!id) return 'N/A';
+            const row = (CNE_NS_ESTADOS || []).find(e => e && String(e.id) === String(id));
+            return row?.nombre ? cneFmtMayusConfirmEntrada(row.nombre) : 'N/A';
+        }
+
+        function cneConfirmacionTextoMunicipioEntrada() {
+            const eid = document.getElementById('estado_id')?.value || '';
+            const mid = document.getElementById('municipio_id')?.value || '';
+            const fromBtn = cneTextoLabelTramiteSearchButtonEntrada('municipio-search-button');
+            if (fromBtn) return fromBtn;
+            if (!mid) return 'N/A';
+            const mapa = MUNICIPIOS_POR_ESTADO || {};
+            const list = mapa[String(eid)] || mapa[eid] || [];
+            const row = (list || []).find(x => x && String(x.id) === String(mid));
+            return row?.nombre ? cneFmtMayusConfirmEntrada(row.nombre) : 'N/A';
+        }
+
+        function cneConfirmacionTextoInstitucionEntrada() {
+            const hid = document.getElementById('institucion');
+            const val = hid ? String(hid.value || '').trim() : '';
+            if (val === 'otro') {
+                const otro = document.getElementById('institucion-otro')?.value.trim() || '';
+                return otro ? cneFmtMayusConfirmEntrada(otro) : 'N/A';
+            }
+            const fromBtn = cneTextoLabelTramiteSearchButtonEntrada('institucion-search-button');
+            if (fromBtn) return fromBtn;
+            if (!val) return 'N/A';
+            const row = (CNE_NS_INST || []).find(x => x && String(x.id) === val);
+            return row?.nombre ? cneFmtMayusConfirmEntrada(row.nombre) : 'N/A';
+        }
         
         function mostrarModalConfirmacion() {
             const modal = document.getElementById('confirmModal');
@@ -3802,23 +3860,29 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             let generoText = 'No seleccionado';
             if (generoValue === 'masculino') generoText = 'Masculino';
             else if (generoValue === 'femenino') generoText = 'Femenino';
-           
-            const institucionSelect = document.getElementById('institucion');
-            let institucion = institucionSelect?.options[institucionSelect.selectedIndex]?.text || 'No seleccionada';
-            if (typeof cneMayusCiudadanoTexto === 'function') institucion = cneMayusCiudadanoTexto(institucion);
-            if (institucionSelect?.value === 'otro') {
-                const otroNombre = document.getElementById('institucion-otro')?.value.trim() || '';
-                if (otroNombre) institucion = typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(otroNombre) : otroNombre;
-            }
-            const areaSelect = document.getElementById('area_id');
-            const area = areaSelect?.options[areaSelect.selectedIndex]?.text || 'No seleccionada';
+
+            const textoEstadoUbic = cneConfirmacionTextoEstadoEntrada();
+            const textoMunicipioUbic = cneConfirmacionTextoMunicipioEntrada();
+            let institucion = cneConfirmacionTextoInstitucionEntrada();
+            if (!institucion || institucion === 'N/A') institucion = 'No seleccionada';
+
+            let area = 'No seleccionada';
+            try {
+                const areaSelect = document.getElementById('area_id');
+                const si = areaSelect?.selectedIndex;
+                if (areaSelect && areaSelect.options && typeof si === 'number' && si >= 0) {
+                    area = areaSelect.options[si]?.text || 'No seleccionada';
+                }
+            } catch (e) { area = 'No seleccionada'; }
+
             const tipoTramiteId = document.getElementById('tipo_tramite_id')?.value || '';
-            
+            const listaTipos = Array.isArray(tiposTramiteData) ? tiposTramiteData : [];
+            const listaCurr = Array.isArray(currentTramiteList) ? currentTramiteList : [];
             let tipoTramite = '';
             if (tipoTramiteId) {
-                tipoTramite = tiposTramiteData.find(t => t.id == tipoTramiteId)?.nombre || '';
+                tipoTramite = listaTipos.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre || '';
                 if (!tipoTramite) {
-                    tipoTramite = currentTramiteList.find(t => t.id == tipoTramiteId)?.nombre || '';
+                    tipoTramite = listaCurr.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre || '';
                 }
             }
             
@@ -3843,6 +3907,14 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                     <div class="flex justify-between">
                         <span class="text-gray-600">Género:</span>
                         <span class="font-semibold">${generoText || 'No especificado'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Estado:</span>
+                        <span class="font-semibold">${textoEstadoUbic || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Municipio:</span>
+                        <span class="font-semibold">${textoMunicipioUbic || 'N/A'}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Institución:</span>
@@ -3901,23 +3973,29 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             let generoText = 'No seleccionado';
             if (generoValue === 'masculino') generoText = 'Masculino';
             else if (generoValue === 'femenino') generoText = 'Femenino';
-           
-            const institucionSelect = document.getElementById('institucion');
-            let institucion = institucionSelect?.options[institucionSelect.selectedIndex]?.text || 'No seleccionada';
-            if (typeof cneMayusCiudadanoTexto === 'function') institucion = cneMayusCiudadanoTexto(institucion);
-            if (institucionSelect?.value === 'otro') {
-                const otroNombre = document.getElementById('institucion-otro')?.value.trim() || '';
-                if (otroNombre) institucion = typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(otroNombre) : otroNombre;
-            }
-            const areaSelect = document.getElementById('area_id');
-            const area = areaSelect?.options[areaSelect.selectedIndex]?.text || 'No seleccionada';
+
+            const textoEstadoUbic = cneConfirmacionTextoEstadoEntrada();
+            const textoMunicipioUbic = cneConfirmacionTextoMunicipioEntrada();
+            let institucion = cneConfirmacionTextoInstitucionEntrada();
+            if (!institucion || institucion === 'N/A') institucion = 'No seleccionada';
+
+            let area = 'No seleccionada';
+            try {
+                const areaSelect = document.getElementById('area_id');
+                const si = areaSelect?.selectedIndex;
+                if (areaSelect && areaSelect.options && typeof si === 'number' && si >= 0) {
+                    area = areaSelect.options[si]?.text || 'No seleccionada';
+                }
+            } catch (e) { area = 'No seleccionada'; }
+
             const tipoTramiteId = document.getElementById('tipo_tramite_id')?.value || '';
-            
+            const listaTiposC = Array.isArray(tiposTramiteData) ? tiposTramiteData : [];
+            const listaCurrC = Array.isArray(currentTramiteList) ? currentTramiteList : [];
             let tipoTramite = '';
             if (tipoTramiteId) {
-                tipoTramite = tiposTramiteData.find(t => t.id == tipoTramiteId)?.nombre || '';
+                tipoTramite = listaTiposC.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre || '';
                 if (!tipoTramite) {
-                    tipoTramite = currentTramiteList.find(t => t.id == tipoTramiteId)?.nombre || '';
+                    tipoTramite = listaCurrC.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre || '';
                 }
             }
             
@@ -3926,7 +4004,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             const telefonoCompleto = telefonoNumero ? `${telefonoCodigo}-${telefonoNumero}` : '';
             const reqsMarcados = obtenerRequisitosMarcadosEntrada();
             const bloqueRequisitos = (tipoSolicitudActual === 'inmediato' && reqsMarcados.length)
-                ? `<div class="pt-2 border-t border-gray-100"><span class="text-gray-600 block mb-1">Requisitos marcados:</span><ul class="list-disc pl-5 text-sm font-semibold text-gray-800 text-left">${reqsMarcados.map(r => `<li>${(r.nombre || '').replace(/</g, '&lt;')}</li>`).join('')}</ul></div>`
+                ? `<div class="pt-2 border-t border-gray-100"><span class="text-gray-600 block mb-1">Requisitos marcados:</span><ul class="list-disc pl-5 text-sm font-semibold text-gray-800 text-left">${reqsMarcados.map(r => `<li>${String(r && r.nombre != null ? r.nombre : '').replace(/</g, '&lt;')}</li>`).join('')}</ul></div>`
                 : '';
             
             detalles.innerHTML = `
@@ -3946,6 +4024,14 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                     <div class="flex justify-between">
                         <span class="text-gray-600">Género:</span>
                         <span class="font-semibold">${generoText || 'No especificado'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Estado:</span>
+                        <span class="font-semibold">${textoEstadoUbic || 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Municipio:</span>
+                        <span class="font-semibold">${textoMunicipioUbic || 'N/A'}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">Institución:</span>
@@ -4267,8 +4353,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
         
         // Eventos de los modales
         document.getElementById('btn-nueva-solicitud')?.addEventListener('click', function() {
-            document.getElementById('successModal').classList.remove('active');
-            document.querySelector('[data-section="nueva-solicitud"]').click();
+            window.location.reload();
         });
         
         document.getElementById('btn-imprimir')?.addEventListener('click', function() {

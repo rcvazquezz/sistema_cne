@@ -1756,8 +1756,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 document.getElementById('confirmCompletadoModalEmp')?.classList.remove('active');
             });
             document.getElementById('btn-nueva-solicitud-emp')?.addEventListener('click', function() {
-                document.getElementById('successModalEmp')?.classList.remove('active');
-                document.querySelector('.menu-item[data-section="nueva-solicitud"]')?.click();
+                window.location.reload();
             });
             document.getElementById('btn-imprimir-emp')?.addEventListener('click', function() {
                 window.print();
@@ -2884,9 +2883,60 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         function textoTipoTramiteSeleccionadoEmp() {
             const tipoTramiteId = document.getElementById('tipo_tramite_id-empleado')?.value || '';
             if (!tipoTramiteId) return '';
-            let nombre = (tiposTramiteDataEmp || []).find(t => String(t.id) === String(tipoTramiteId))?.nombre;
-            if (!nombre) nombre = (currentTramiteListEmpleado || []).find(t => String(t.id) === String(tipoTramiteId))?.nombre;
+            const listA = Array.isArray(tiposTramiteDataEmp) ? tiposTramiteDataEmp : [];
+            const listB = Array.isArray(currentTramiteListEmpleado) ? currentTramiteListEmpleado : [];
+            let nombre = listA.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre;
+            if (!nombre) nombre = listB.find(t => t && String(t.id) === String(tipoTramiteId))?.nombre;
             return nombre || '';
+        }
+
+        /** Texto visible del botón tipo trámite (institución/estado/municipio: input hidden + buscador). */
+        function cneTextoLabelTramiteSearchButtonEmp(buttonId) {
+            const btn = document.getElementById(buttonId);
+            const span = btn?.querySelector('.selected-tramite-text');
+            if (!span) return '';
+            if (span.classList.contains('tramite-placeholder')) return '';
+            return (span.textContent || '').trim();
+        }
+
+        function cneFmtMayusConfirmEmp(s) {
+            if (s == null || s === '') return '';
+            return typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(String(s)) : String(s);
+        }
+
+        function cneConfirmacionTextoEstadoEmp() {
+            const id = document.getElementById('estado_id-empleado')?.value;
+            const fromBtn = cneTextoLabelTramiteSearchButtonEmp('estado-search-button-empleado');
+            if (fromBtn) return fromBtn;
+            if (!id) return 'N/A';
+            const row = (CNE_NS_ESTADOS_EMP || []).find(e => e && String(e.id) === String(id));
+            return row?.nombre ? cneFmtMayusConfirmEmp(row.nombre) : 'N/A';
+        }
+
+        function cneConfirmacionTextoMunicipioEmp() {
+            const eid = document.getElementById('estado_id-empleado')?.value || '';
+            const mid = document.getElementById('municipio_id-empleado')?.value || '';
+            const fromBtn = cneTextoLabelTramiteSearchButtonEmp('municipio-search-button-empleado');
+            if (fromBtn) return fromBtn;
+            if (!mid) return 'N/A';
+            const mapa = MUNICIPIOS_POR_ESTADO_EMP || {};
+            const list = mapa[String(eid)] || mapa[eid] || [];
+            const row = (list || []).find(x => x && String(x.id) === String(mid));
+            return row?.nombre ? cneFmtMayusConfirmEmp(row.nombre) : 'N/A';
+        }
+
+        function cneConfirmacionTextoInstitucionEmp() {
+            const hid = document.getElementById('institucion-empleado');
+            const val = hid ? String(hid.value || '').trim() : '';
+            if (val === 'otro') {
+                const otro = document.getElementById('institucion-otro-empleado')?.value.trim() || '';
+                return otro ? cneFmtMayusConfirmEmp(otro) : 'N/A';
+            }
+            const fromBtn = cneTextoLabelTramiteSearchButtonEmp('institucion-search-button-empleado');
+            if (fromBtn) return fromBtn;
+            if (!val) return 'N/A';
+            const row = (CNE_NS_INST_EMP || []).find(x => x && String(x.id) === val);
+            return row?.nombre ? cneFmtMayusConfirmEmp(row.nombre) : 'N/A';
         }
 
         function armarDetalleConfirmacionEmpHtml(estadoTxt, estadoClass) {
@@ -2901,22 +2951,25 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             let generoText = 'No seleccionado';
             if (generoValue === 'masculino') generoText = 'Masculino';
             else if (generoValue === 'femenino') generoText = 'Femenino';
-            const institucionSelect = document.getElementById('institucion-empleado');
-            let institucion = institucionSelect?.options[institucionSelect.selectedIndex]?.text || 'No seleccionada';
-            if (typeof cneMayusCiudadanoTexto === 'function') institucion = cneMayusCiudadanoTexto(institucion);
-            if (institucionSelect?.value === 'otro') {
-                const otroNombre = document.getElementById('institucion-otro-empleado')?.value.trim() || '';
-                if (otroNombre) institucion = typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(otroNombre) : otroNombre;
-            }
+            const textoEstadoUbic = cneConfirmacionTextoEstadoEmp();
+            const textoMunicipioUbic = cneConfirmacionTextoMunicipioEmp();
+            let institucion = cneConfirmacionTextoInstitucionEmp();
+            if (!institucion || institucion === 'N/A') institucion = 'No seleccionada';
             const areaSelect = document.getElementById('area_id-empleado');
-            const area = areaSelect?.options[areaSelect.selectedIndex]?.text || 'No seleccionada';
+            let area = 'No seleccionada';
+            try {
+                const si = areaSelect?.selectedIndex;
+                if (areaSelect && areaSelect.options && typeof si === 'number' && si >= 0) {
+                    area = areaSelect.options[si]?.text || 'No seleccionada';
+                }
+            } catch (e) { area = 'No seleccionada'; }
             const tipoTramite = textoTipoTramiteSeleccionadoEmp();
             const nombreCompleto = typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto((nombres + ' ' + apellidos).trim()) : (nombres + ' ' + apellidos).trim();
             const cedulaCompleta = cedulaNumero ? (cedulaTipo + '-' + cedulaNumero) : '';
             const telefonoCompleto = telefonoNumero ? (telefonoCodigo + '-' + telefonoNumero) : '';
             const reqsMarcados = obtenerRequisitosMarcadosEmpleado();
             const bloqueRequisitos = (tipoSolicitudActualEmp === 'inmediato' && reqsMarcados.length)
-                ? `<div class="pt-2 border-t border-gray-100"><span class="text-gray-600 block mb-1">Requisitos marcados:</span><ul class="list-disc pl-5 text-sm font-semibold text-gray-800">${reqsMarcados.map(r => `<li>${(r.nombre || '').replace(/</g, '&lt;')}</li>`).join('')}</ul></div>`
+                ? `<div class="pt-2 border-t border-gray-100"><span class="text-gray-600 block mb-1">Requisitos marcados:</span><ul class="list-disc pl-5 text-sm font-semibold text-gray-800">${reqsMarcados.map(r => `<li>${String(r && r.nombre != null ? r.nombre : '').replace(/</g, '&lt;')}</li>`).join('')}</ul></div>`
                 : '';
             return `
                 <div class="space-y-3">
@@ -2924,6 +2977,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Cédula:</span><span class="font-mono font-semibold">${cedulaCompleta || 'No especificada'}</span></div>
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Teléfono:</span><span class="font-semibold">${telefonoCompleto || 'No especificado'}</span></div>
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Género:</span><span class="font-semibold">${generoText}</span></div>
+                    <div class="flex justify-between gap-2"><span class="text-gray-600">Estado:</span><span class="font-semibold text-right">${textoEstadoUbic || 'N/A'}</span></div>
+                    <div class="flex justify-between gap-2"><span class="text-gray-600">Municipio:</span><span class="font-semibold text-right">${textoMunicipioUbic || 'N/A'}</span></div>
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Institución:</span><span class="font-semibold text-right">${institucion}</span></div>
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Coordinación:</span><span class="font-semibold text-right">${area}</span></div>
                     <div class="flex justify-between gap-2"><span class="text-gray-600">Tipo de Trámite:</span><span class="font-semibold text-right">${tipoTramite || 'No seleccionado'}</span></div>
