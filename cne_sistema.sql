@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   `tramite_id` int NOT NULL,
   `coordinacion_actual_id` int DEFAULT NULL COMMENT 'Coordinación actual del trámite (p. ej. tras redirección); el tramite_id sigue definiendo el tipo',
   `solicitud_descripcion` text,
-  `solicitud_estado` varchar(20) DEFAULT 'pendiente' COMMENT 'Códigos: pendiente, en_revision (UI En Proceso), aprobada, rechazada, completada, redirigida, vencida',
+  `solicitud_estado` varchar(20) DEFAULT 'pendiente' COMMENT 'Códigos: pendiente, en_revision (UI En Proceso), aprobada, rechazada, completada, redirigida, vencida, invalidada',
   `solicitud_fecha_solicitud` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `solicitud_fecha_limite` date DEFAULT NULL COMMENT 'Opcional: plazo/SLA (reservado)',
   `empleado_asignado_id` varchar(20) DEFAULT NULL,
@@ -296,7 +296,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   CONSTRAINT `fk_solicitudes_empleado_asignado` FOREIGN KEY (`empleado_asignado_id`) REFERENCES `usuarios` (`user_identificacion`) ON DELETE SET NULL,
   CONSTRAINT `fk_solicitudes_tramite` FOREIGN KEY (`tramite_id`) REFERENCES `tramite` (`tramite_id`),
   CONSTRAINT `fk_solicitudes_coord_actual` FOREIGN KEY (`coordinacion_actual_id`) REFERENCES `coordinacion` (`coordinacion_id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `solicitudes_chk_estado` CHECK ((`solicitud_estado` in (_utf8mb4'pendiente',_utf8mb4'en_revision',_utf8mb4'aprobada',_utf8mb4'rechazada',_utf8mb4'completada',_utf8mb4'redirigida',_utf8mb4'vencida')))
+  CONSTRAINT `solicitudes_chk_estado` CHECK ((`solicitud_estado` in (_utf8mb4'pendiente',_utf8mb4'en_revision',_utf8mb4'aprobada',_utf8mb4'rechazada',_utf8mb4'completada',_utf8mb4'redirigida',_utf8mb4'vencida',_utf8mb4'invalidada')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- La exportación de datos fue deseleccionada.

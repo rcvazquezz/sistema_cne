@@ -75,6 +75,7 @@ try {
         'vencida' => 'VENCIDO',
         'completada' => 'Completada',
         'redirigida' => 'Redirigida',
+        'invalidada' => 'Invalidada',
     ];
 
     $genero_labels = [

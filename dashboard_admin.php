@@ -101,6 +101,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
         .status-sol-rojo { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
         .status-sol-vencido { background:#e9ecef; color:#343a40; border:1px solid #6c757d; }
         .status-sol-morado { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
+        .status-sol-invalidada { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
         /* Cédula usuario — misma línea visual que dashboard_entrada.php */
         .cedula-tipo-compact { min-width: 60px; }
         .cedula-input-compact { min-width: 120px; }
@@ -546,7 +547,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
         <!-- Modal editar solicitud -->
         <div id="modal-editar-solicitud-admin" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true">
             <div class="absolute inset-0 bg-slate-900/50" data-close-edit-sol-admin></div>
-            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg my-4 border border-gray-200 overflow-hidden">
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-xl my-4 border border-gray-200 overflow-hidden">
                 <div class="px-5 py-4 bg-gradient-to-r from-blue-900 to-blue-600 text-white flex justify-between items-center">
                     <h3 class="font-semibold text-lg"><i class="fas fa-edit mr-2"></i>Editar solicitud</h3>
                     <button type="button" class="p-2 rounded-lg hover:bg-white/15" data-close-edit-sol-admin><i class="fas fa-times"></i></button>
@@ -591,6 +592,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                                 <option value="completada">Completada</option>
                                 <option value="redirigida">Redirigida</option>
                                 <option value="vencida">Vencida</option>
+                                <option value="invalidada">Invalidada</option>
                             </select>
                         </div>
                         <div class="sm:col-span-2">
@@ -602,21 +604,19 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                             <select id="edit-sol-tramite" required class="w-full p-3 border border-gray-200 rounded-lg bg-yellow-100 focus:ring-2 focus:ring-blue-500 text-sm"></select>
                         </div>
                     </div>
-                    <div id="wrap-redirigir-admin" class="hidden border-t border-gray-100 pt-4 space-y-3">
-                        <label class="block text-xs font-semibold text-gray-600">Redirigir a coordinación</label>
-                        <select id="edit-redir-destino" class="w-full p-3 border border-amber-200 rounded-lg bg-amber-50/50 text-sm"></select>
-                        <label class="block text-xs font-semibold text-gray-600">Motivo / observaciones</label>
-                        <textarea id="edit-redir-motivo" rows="2" class="w-full p-3 border border-gray-200 rounded-lg text-sm" placeholder="Indique el motivo de la redirección"></textarea>
-                        <button type="button" id="btn-admin-ejecutar-redirigir" class="w-full py-3 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 text-sm">
-                            <i class="fas fa-share mr-2"></i>Ejecutar redirección
-                        </button>
+                    <div id="wrap-requisitos-sol-admin" class="border-t border-gray-100 pt-4 space-y-2">
+                        <label class="block text-xs font-semibold text-gray-600">Requisitos del trámite</label>
+                        <p id="edit-sol-requisitos-hint" class="text-xs text-gray-500 leading-snug"></p>
+                        <div id="edit-sol-requisitos-list" class="space-y-2 max-h-52 overflow-y-auto custom-scrollbar rounded-lg border border-gray-100 p-3 bg-gray-50/80">
+                            <p class="text-sm text-gray-500">Cargando requisitos…</p>
+                        </div>
                     </div>
-                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                        <button type="submit" class="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 text-sm">
-                            <i class="fas fa-save mr-2"></i>Guardar
+                    <div class="flex flex-col gap-3 pt-2 border-t border-gray-100">
+                        <button type="submit" class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 text-sm">
+                            <i class="fas fa-save mr-2"></i>Guardar cambios
                         </button>
-                        <button type="button" id="btn-toggle-redirigir-admin" class="flex-1 py-3 rounded-lg border-2 border-amber-500 text-amber-700 font-semibold hover:bg-amber-50 text-sm">
-                            <i class="fas fa-random mr-2"></i>Redirigir
+                        <button type="button" id="btn-admin-eliminar-solicitud" class="w-full py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 text-sm">
+                            <i class="fas fa-trash-alt mr-2"></i>Eliminar solicitud
                         </button>
                     </div>
                 </form>
@@ -1076,12 +1076,13 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
             if (e === 'completada' || e === 'ok') return 'status-sol-ok';
             if (e === 'rechazada' || e === 'vencida') return 'status-sol-vencido';
             if (e === 'redirigida') return 'status-sol-morado';
+            if (e === 'invalidada') return 'status-sol-invalidada';
             return 'status-sol-pendiente';
         }
 
         function etiquetaEstadoSolAdmin(est) {
             const key = (est || '').toLowerCase();
-            const m = { pendiente: 'Pendiente', en_revision: 'En Proceso', aprobada: 'En Proceso', rechazada: 'VENCIDO', completada: 'Completada', redirigida: 'Redirigida', vencida: 'VENCIDO' };
+            const m = { pendiente: 'Pendiente', en_revision: 'En Proceso', aprobada: 'En Proceso', rechazada: 'VENCIDO', completada: 'Completada', redirigida: 'Redirigida', vencida: 'VENCIDO', invalidada: 'Invalidada' };
             if (m[key]) return m[key];
             if (!est) return '—';
             return String(est).replace(/_/g, ' ');
@@ -1134,7 +1135,81 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
         function cerrarModalEditSolAdmin() {
             const el = document.getElementById('modal-editar-solicitud-admin');
             if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
-            document.getElementById('wrap-redirigir-admin')?.classList.add('hidden');
+        }
+
+        function adminEstadoPermiteEditarRequisitos(est) {
+            const e = (est || '').toLowerCase();
+            return e === 'en_revision' || e === 'completada' || e === 'redirigida' || e === 'invalidada';
+        }
+
+        function aplicarBloqueoRequisitosSolAdmin() {
+            const estSel = document.getElementById('edit-solicitud-estado');
+            const est = estSel ? estSel.value : '';
+            const allow = adminEstadoPermiteEditarRequisitos(est);
+            const hint = document.getElementById('edit-sol-requisitos-hint');
+            if (hint) {
+                hint.textContent = allow
+                    ? 'Puede marcar o desmarcar requisitos para corregir el registro de la solicitud.'
+                    : 'Con el estado Pendiente los requisitos permanecen bloqueados. Use En proceso, Completada, Redirigida o Invalidada para poder corregirlos.';
+            }
+            document.querySelectorAll('#edit-sol-requisitos-list .edit-sol-req-cb').forEach(function(cb) {
+                cb.disabled = !allow;
+            });
+        }
+
+        function cargarRequisitosListaSolAdmin(solicitudId, tramiteId) {
+            const list = document.getElementById('edit-sol-requisitos-list');
+            if (!list) return;
+            list.innerHTML = '<p class="text-sm text-gray-500">Cargando requisitos…</p>';
+            fetch('ajax/admin_solicitud_requisitos_ui.php?solicitud_id=' + encodeURIComponent(solicitudId) + '&tramite_id=' + encodeURIComponent(tramiteId))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (!d.success) {
+                        list.innerHTML = '<p class="text-sm text-red-600">' + escapeHtmlAdmin(d.message || 'Error') + '</p>';
+                        return;
+                    }
+                    const reqs = d.requisitos || [];
+                    if (!reqs.length) {
+                        list.innerHTML = '<p class="text-sm text-gray-500">Este trámite no tiene requisitos activos en catálogo.</p>';
+                    } else {
+                        list.innerHTML = reqs.map(function(r) {
+                            const id = r.requisito_id;
+                            const chk = r.marcado ? ' checked' : '';
+                            return '<label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">' +
+                                '<input type="checkbox" class="edit-sol-req-cb mt-0.5 rounded border-gray-300 text-blue-600" data-requisito-id="' + id + '"' + chk + ' />' +
+                                '<span>' + escapeHtmlAdmin(r.requisito_nombre || '') + '</span></label>';
+                        }).join('');
+                    }
+                    aplicarBloqueoRequisitosSolAdmin();
+                })
+                .catch(function() {
+                    list.innerHTML = '<p class="text-sm text-red-600">Error de conexión</p>';
+                });
+        }
+
+        function obtenerRequisitosMarcadosSolAdmin() {
+            return Array.from(document.querySelectorAll('#edit-sol-requisitos-list .edit-sol-req-cb'))
+                .filter(function(cb) { return cb.checked && !cb.disabled; })
+                .map(function(cb) { return parseInt(cb.getAttribute('data-requisito-id'), 10); })
+                .filter(function(n) { return !isNaN(n); });
+        }
+
+        function quitarFilaBuscarSolicitudesAdmin(solicitudId) {
+            const tbody = document.getElementById('admin-buscar-sol-tbody');
+            if (!tbody) return;
+            const tr = tbody.querySelector('tr[data-solicitud-id="' + solicitudId + '"]');
+            if (tr) tr.remove();
+            const rest = tbody.querySelectorAll('tr').length;
+            const resumen = document.getElementById('admin-buscar-sol-resumen');
+            if (resumen) {
+                if (rest > 1) resumen.textContent = 'Se encontraron ' + rest + ' solicitudes.';
+                else if (rest === 1) resumen.classList.add('hidden');
+            }
+            if (rest === 0) {
+                document.getElementById('admin-buscar-sol-resultado')?.classList.add('hidden');
+                const vacio = document.getElementById('admin-buscar-sol-vacio');
+                if (vacio) vacio.classList.remove('hidden');
+            }
         }
 
         function llenarSelectTramitesAdmin(tramites, selectedId) {
@@ -1184,14 +1259,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
 
                     llenarSelectTramitesAdmin(d.tramites, sol.tramite_id);
 
-                    const selRed = document.getElementById('edit-redir-destino');
-                    selRed.innerHTML = adminEdicionCoords.filter(function(c) {
-                        return coordinacionPermiteComoDestinoRedireccion(c) && String(c.coordinacion_id) !== String(sol.coordinacion_id);
-                    }).map(function(c) {
-                        return '<option value="' + c.coordinacion_id + '">' + escapeHtmlAdmin(c.coordinacion_nombre) + '</option>';
-                    }).join('');
-                    document.getElementById('edit-redir-motivo').value = '';
-                    document.getElementById('wrap-redirigir-admin').classList.add('hidden');
+                    cargarRequisitosListaSolAdmin(sol.solicitud_id, sol.tramite_id);
 
                     const m = document.getElementById('modal-editar-solicitud-admin');
                     m.classList.remove('hidden');
@@ -1236,7 +1304,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                         tbody.innerHTML = list.map(function(t) {
                             const sid = parseInt(t.solicitud_id, 10);
                             const est = (t.estado || '').toLowerCase();
-                            return '<tr class="hover:bg-gray-50">' +
+                            return '<tr class="hover:bg-gray-50" data-solicitud-id="' + sid + '">' +
                                 '<td class="px-4 py-3 font-mono font-semibold text-blue-700">' + escapeHtmlAdmin(t.numero_seguimiento) + '</td>' +
                                 '<td class="px-4 py-3"><span class="status-badge ' + claseBadgeEstadoSolAdmin(est) + '">' + escapeHtmlAdmin(etiquetaEstadoSolAdmin(est)) + '</span></td>' +
                                 '<td class="px-4 py-3 text-gray-800 max-w-[140px]">' + escapeHtmlAdmin(t.ciudadano_nombre) + '</td>' +
@@ -1301,26 +1369,30 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 document.getElementById('edit-sol-coordinacion')?.addEventListener('change', function() {
                     const cid = this.value;
                     if (!cid) return;
-                    const selRed = document.getElementById('edit-redir-destino');
-                    if (selRed && adminEdicionCoords.length) {
-                        selRed.innerHTML = adminEdicionCoords.filter(function(c) {
-                            return coordinacionPermiteComoDestinoRedireccion(c) && String(c.coordinacion_id) !== String(cid);
-                        }).map(function(c) {
-                            return '<option value="' + c.coordinacion_id + '">' + escapeHtmlAdmin(c.coordinacion_nombre) + '</option>';
-                        }).join('');
-                    }
                     fetch('ajax/admin_tramites_por_coordinacion.php?coordinacion_id=' + encodeURIComponent(cid))
                         .then(r => r.json())
                         .then(function(d) {
-                            if (d.success) llenarSelectTramitesAdmin(d.tramites, null);
+                            if (d.success) {
+                                llenarSelectTramitesAdmin(d.tramites, null);
+                                const sid = document.getElementById('edit-sol-id') && document.getElementById('edit-sol-id').value;
+                                const tid = document.getElementById('edit-sol-tramite') && document.getElementById('edit-sol-tramite').value;
+                                if (sid && tid) cargarRequisitosListaSolAdmin(parseInt(sid, 10), parseInt(tid, 10));
+                            }
                         });
                 });
+                document.getElementById('edit-sol-tramite')?.addEventListener('change', function() {
+                    const sid = document.getElementById('edit-sol-id') && document.getElementById('edit-sol-id').value;
+                    const tid = this.value;
+                    if (sid && tid) cargarRequisitosListaSolAdmin(parseInt(sid, 10), parseInt(tid, 10));
+                });
+                document.getElementById('edit-solicitud-estado')?.addEventListener('change', aplicarBloqueoRequisitosSolAdmin);
                 document.getElementById('form-editar-solicitud-admin')?.addEventListener('submit', function(e) {
                     e.preventDefault();
                     const fd = new URLSearchParams();
                     fd.append('solicitud_id', document.getElementById('edit-sol-id').value);
                     fd.append('solicitud_estado', document.getElementById('edit-solicitud-estado').value);
                     fd.append('tramite_id', document.getElementById('edit-sol-tramite').value);
+                    fd.append('requisitos', JSON.stringify(obtenerRequisitosMarcadosSolAdmin()));
                     fetch('ajax/admin_solicitud_guardar.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })
                         .then(r => r.json())
                         .then(function(d) {
@@ -1329,37 +1401,33 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                         })
                         .catch(function() { toast('error', 'Error de red'); });
                 });
-                document.getElementById('btn-toggle-redirigir-admin')?.addEventListener('click', function() {
-                    const wrap = document.getElementById('wrap-redirigir-admin');
-                    if (!wrap) return;
-                    const abrir = wrap.classList.contains('hidden');
-                    wrap.classList.toggle('hidden');
-                    if (abrir) {
-                        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        setTimeout(function() {
-                            document.getElementById('edit-redir-destino')?.focus();
-                        }, 200);
-                    }
-                });
-                document.getElementById('btn-admin-ejecutar-redirigir')?.addEventListener('click', function() {
-                    const sid = document.getElementById('edit-sol-id').value;
-                    const dest = document.getElementById('edit-redir-destino').value;
-                    const motivo = document.getElementById('edit-redir-motivo').value.trim();
-                    if (!dest) { toast('error', 'Seleccione coordinación destino'); return; }
-                    const fd = new URLSearchParams();
-                    fd.append('solicitud_id', sid);
-                    fd.append('destino_coordinacion_id', dest);
-                    fd.append('motivo', motivo);
-                    fetch('ajax/admin_solicitud_redirigir.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })
-                        .then(r => r.json())
-                        .then(function(d) {
-                            toast(d.success ? 'success' : 'error', d.message || '');
-                            if (d.success) {
-                                cerrarModalEditSolAdmin();
-                                ejecutarBuscarSolicitudesAdmin();
-                            }
-                        })
-                        .catch(function() { toast('error', 'Error de red'); });
+                document.getElementById('btn-admin-eliminar-solicitud')?.addEventListener('click', function() {
+                    const sid = parseInt(document.getElementById('edit-sol-id').value, 10);
+                    const num = (document.getElementById('edit-sol-numero') && document.getElementById('edit-sol-numero').textContent) ? document.getElementById('edit-sol-numero').textContent.trim() : '';
+                    if (!sid) return;
+                    Swal.fire({
+                        title: '¿Eliminar solicitud?',
+                        text: 'Se eliminará permanentemente la solicitud ' + (num || ('#' + sid)) + '. Esta acción no se puede deshacer.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#dc2626'
+                    }).then(function(res) {
+                        if (!res.isConfirmed) return;
+                        const fd = new URLSearchParams();
+                        fd.append('solicitud_id', String(sid));
+                        fetch('ajax/admin_solicitud_eliminar.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })
+                            .then(function(r) { return r.json(); })
+                            .then(function(d) {
+                                toast(d.success ? 'success' : 'error', d.message || (d.success ? 'Eliminada' : 'Error'));
+                                if (d.success) {
+                                    cerrarModalEditSolAdmin();
+                                    quitarFilaBuscarSolicitudesAdmin(sid);
+                                }
+                            })
+                            .catch(function() { toast('error', 'Error de red'); });
+                    });
                 });
             }
         }
@@ -2053,7 +2121,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 toast(d.success ? 'success' : 'error', d.message || 'Error');
                 if (d.success) { cerrarModalRequisito(); if (tramiteSeleccionado) seleccionarTramite(tramiteSeleccionado); }
             });
-        });
+        }); 
 
         window.addEventListener('cne:realtime', function(ev) {
             const d = ev.detail && ev.detail.event;

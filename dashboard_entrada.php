@@ -251,6 +251,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
         .status-completado { background-color: #d1fae5; color: #065f46; }
         .status-cancelado { background-color: #fee2e2; color: #991b1b; }
         .status-redirigido { background-color: #f3e8ff; color: #5b21b6; }
+        .status-invalidada { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         .status-vencido { background-color: #e9ecef; color: #343a40; border: 1px solid #6c757d; }
         
         /* Mejoras para inputs en móvil */
@@ -1444,6 +1445,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                                     <option value="completada">Completada</option>
                                     <option value="redirigida">Redirigida</option>
                                     <option value="vencida">Vencido</option>
+                                    <option value="invalidada">Invalidada</option>
                                 </select>
                             </div>
                             
@@ -4233,7 +4235,8 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                 rechazada: 'status-vencido',
                 vencida: 'status-vencido',
                 completada: 'status-completado',
-                redirigida: 'status-redirigido'
+                redirigida: 'status-redirigido',
+                invalidada: 'status-invalidada'
             };
             return mapa[estado] || 'status-pendiente';
         }

@@ -73,6 +73,8 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
         .status-completado { background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7; }
         .status-cancelado { background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; }
         .status-redirigido { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
+        .status-invalidada { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+        .kpi-card-danger { background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%); color: white; border-radius: 12px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .status-vencido { background:#e9ecef; color:#343a40; border:1px solid #6c757d; }
         .status-en-caracas { background:#ccfbf1; color:#0d9488; border:1px solid #5eead4; }
         .status-activo { background:#ecfdf5; color:#059669; }
@@ -190,10 +192,11 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                             <option value="completada">Completada</option>
                             <option value="redirigida">Redirigida</option>
                             <option value="vencida">Vencido</option>
+                            <option value="invalidada">Invalidada</option>
                         </select>
                         <button id="btn-aplicar-filtros" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><i class="fas fa-filter mr-1"></i> Aplicar</button>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4 flex-shrink-0">
+                    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-4 flex-shrink-0">
                         <div class="kpi-card">
                             <p class="text-xs text-blue-100">Total</p>
                             <p class="text-2xl font-bold" id="kpi-total">0</p>
@@ -217,6 +220,10 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                         <div class="kpi-card">
                             <p class="text-xs text-blue-100">Redirigidos</p>
                             <p class="text-2xl font-bold" id="kpi-redirigidos">0</p>
+                        </div>
+                        <div class="kpi-card-danger">
+                            <p class="text-xs text-red-100 flex items-center gap-1"><i class="fas fa-exclamation-triangle"></i> Trámites invalidados</p>
+                            <p class="text-2xl font-bold" id="kpi-invalidados">0</p>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
@@ -290,6 +297,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                                     <option value="completada">Completada</option>
                                     <option value="redirigida">Redirigida</option>
                                     <option value="vencida">Vencido</option>
+                                    <option value="invalidada">Invalidada</option>
                                 </select>
                             </div>
                             <div>
@@ -508,8 +516,8 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
     </div>
 
     <script>
-        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigida', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO' };
-        const estClass = { pendiente: 'status-pendiente', en_revision: 'status-proceso', completada: 'status-completado', redirigida: 'status-redirigido', aprobada: 'status-proceso', rechazada: 'status-vencido', vencida: 'status-vencido' };
+        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigida', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO', invalidada: 'Invalidada' };
+        const estClass = { pendiente: 'status-pendiente', en_revision: 'status-proceso', completada: 'status-completado', redirigida: 'status-redirigido', aprobada: 'status-proceso', rechazada: 'status-vencido', vencida: 'status-vencido', invalidada: 'status-invalidada' };
         const sidebar = document.getElementById('sidebar');
         const menuBtn = document.getElementById('menu-btn');
         const menuClose = document.getElementById('menu-close-btn');
@@ -594,6 +602,8 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                 document.getElementById('kpi-completados').textContent = k.completados ?? 0;
                 document.getElementById('kpi-vencidos').textContent = k.vencidos ?? 0;
                 document.getElementById('kpi-redirigidos').textContent = k.redirigidos ?? 0;
+                const ki = document.getElementById('kpi-invalidados');
+                if (ki) ki.textContent = k.invalidados ?? 0;
                 const cb = d.chart_bar || { labels: [], data: [], colors: [] };
                 const cp = d.chart_pie || { labels: [], data: [] };
                 const barColors = cb.colors && cb.colors.length ? cb.colors : ['#f59e0b','#3b82f6','#10b981','#6b7280','#8b5cf6','#f97316','#ef4444'];
@@ -831,8 +841,8 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                     if (!d.success) { alert('Error al obtener datos'); return; }
                     window.reporteMetadata = { tipo, nombreBase, generatedAt: new Date().toLocaleString('es-VE') };
                     const filas = d.filas || [];
-                    const th = '<thead><tr>' + ['Funcionario', 'Pendientes', 'En Proceso', 'Completados', 'Vencidos', 'Redirigidos', 'Total'].map(h => '<th>' + h + '</th>').join('') + '</tr></thead>';
-                    tbl.innerHTML = th + '<tbody>' + filas.map(f => `<tr><td>${f.funcionario || '-'}</td><td>${f.pendientes}</td><td>${f.en_proceso}</td><td>${f.completados}</td><td>${f.vencidos}</td><td>${f.redirigidos}</td><td>${f.total}</td></tr>`).join('') + '</tbody>';
+                    const th = '<thead><tr>' + ['Funcionario', 'Pendientes', 'En Proceso', 'Completados', 'Vencidos', 'Redirigidos', 'Invalidados', 'Total'].map(h => '<th>' + h + '</th>').join('') + '</tr></thead>';
+                    tbl.innerHTML = th + '<tbody>' + filas.map(f => `<tr><td>${f.funcionario || '-'}</td><td>${f.pendientes}</td><td>${f.en_proceso}</td><td>${f.completados}</td><td>${f.vencidos}</td><td>${f.redirigidos}</td><td>${f.invalidados ?? 0}</td><td>${f.total}</td></tr>`).join('') + '</tbody>';
                     if (formato === 'pdf') exportarPDF(); else exportarExcel();
                 });
             } else {

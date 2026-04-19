@@ -147,6 +147,10 @@ try {
                 $estado_class = 'status-redirigido';
                 $estado_text = 'Redirigida';
                 break;
+            case 'invalidada':
+                $estado_class = 'status-invalidada';
+                $estado_text = 'Invalidada';
+                break;
         }
         
         // Mostrar las columnas en el orden solicitado:

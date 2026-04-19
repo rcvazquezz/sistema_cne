@@ -597,6 +597,7 @@ function presentarEstadoSolicitudReporteDirector($estado) {
         'rechazada' => 'Vencido',
         'redirigida' => 'Redirigido',
         'redirigido' => 'Redirigido',
+        'invalidada' => 'Invalidada',
     ];
     if (isset($map[$k])) {
         return $map[$k];
@@ -722,7 +723,7 @@ function cneEmpleadoMensajeSiSolicitudNoGestionable(PDO $db, int $solicitud_id):
         return 'Trámite no encontrado';
     }
     $est = strtolower((string) ($row['solicitud_estado'] ?? ''));
-    if ($est === 'completada' || $est === 'vencida') {
+    if ($est === 'completada' || $est === 'vencida' || $est === 'invalidada') {
         return 'Este trámite está finalizado y no puede gestionarse';
     }
     $ts = cneEmpleadoUltimoRecibidoCaracasTs($db, $solicitud_id);
@@ -746,6 +747,9 @@ function cneEstadoParaReporteFila(string $estadoEfectivo, string $estadoTabla, ?
     $tab = strtolower(trim($estadoTabla));
     if ($eff === 'redirigida') {
         return 'redirigida';
+    }
+    if ($tab === 'invalidada' || $eff === 'invalidada') {
+        return 'invalidada';
     }
     if ($tab === 'vencida' || $eff === 'vencida') {
         return 'vencida';
@@ -793,11 +797,12 @@ function cneSqlCaseEstadoParaReporte(string $condRedirigida): string {
 
     return "CASE
         WHEN ($condRedirigida) THEN 'redirigida'
+        WHEN s.solicitud_estado = 'invalidada' THEN 'invalidada'
         WHEN s.solicitud_estado = 'vencida' THEN 'vencida'
         WHEN s.solicitud_estado = 'completada' THEN 'completada'
         WHEN cne_rec_car.cne_recibido_caracas_dt IS NOT NULL
             AND TIMESTAMPDIFF(DAY, cne_rec_car.cne_recibido_caracas_dt, NOW()) > {$d}
-            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada') THEN 'vencida'
+            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada','invalidada') THEN 'vencida'
         ELSE s.solicitud_estado
     END";
 }
@@ -813,7 +818,7 @@ function cneSqlCondicionVencidaEfectiva(): string {
         OR (
             cne_rec_car.cne_recibido_caracas_dt IS NOT NULL
             AND TIMESTAMPDIFF(DAY, cne_rec_car.cne_recibido_caracas_dt, NOW()) > {$d}
-            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada')
+            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada','invalidada')
         ))";
 }
 
