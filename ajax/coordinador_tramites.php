@@ -35,19 +35,29 @@ try {
         $hasCoordActual = (bool)$chk->fetchColumn();
     } catch (Exception $e) {}
 
-    $coordWhere = $hasCoordActual
-        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
-        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
+    $tieneTramiteIdInicial = cneSolicitudesTieneTramiteIdInicial($db);
+    $tidEtqSql = cneSqlExpresionTramiteIdEtiqueta($tieneTramiteIdInicial);
+
+    $coordWhere = cneSqlWhereCoordinacionVinculaSolicitud($hasCoordActual);
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
     $sql = "
         SELECT s.solicitud_id, s.solicitud_numero, s.solicitud_fecha_solicitud as fecha_registro,
                CASE
-                   WHEN COALESCE(au.coord_destino, $coordSelect) <> :cid_redir AND au.coord_destino IS NOT NULL
-                   THEN 'redirigida'
+                   WHEN au.coord_destino IS NOT NULL AND (
+                       au.coord_origen_id = :cid_redir
+                       OR (au.coord_origen_id IS NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid_redir)
+                   ) THEN 'redirigida'
                    ELSE s.solicitud_estado
                END AS solicitud_estado,
                c.ciudadano_identificacion, CONCAT(c.ciudadano_nombres,' ',c.ciudadano_apellidos) as ciudadano_nombre,
-               t.tramite_nombre,
+               CASE 
+                   WHEN t_etq.tramite_padre_id IS NOT NULL AND tp_etq.tramite_id IS NOT NULL 
+                       THEN CONCAT(tp_etq.tramite_nombre, ' — ', t_etq.tramite_nombre)
+                   WHEN t_etq.tramite_id IS NOT NULL THEN t_etq.tramite_nombre
+                   WHEN t.tramite_padre_id IS NOT NULL AND tp_op.tramite_id IS NOT NULL 
+                       THEN CONCAT(tp_op.tramite_nombre, ' — ', t.tramite_nombre)
+                   ELSE t.tramite_nombre
+               END AS tramite_nombre,
                u_asig.user_nombres as emp_nombres, u_asig.user_apellidos as emp_apellidos,
                u_asig.rol_id as emp_rol_id,
                u_crea.user_nombres as creador_nombres, u_crea.user_apellidos as creador_apellidos,
@@ -56,20 +66,14 @@ try {
                au.redirigido_por_id
         FROM solicitudes s
         JOIN ciudadanos c ON s.ciudadano_identificacion = c.ciudadano_identificacion
+        " . trim(cneSqlJoinAuditoriaTramiteIdCreacion()) . "
         JOIN tramite t ON s.tramite_id = t.tramite_id
+        LEFT JOIN tramite t_etq ON t_etq.tramite_id = $tidEtqSql
+        LEFT JOIN tramite tp_etq ON tp_etq.tramite_id = t_etq.tramite_padre_id
+        LEFT JOIN tramite tp_op ON tp_op.tramite_id = t.tramite_padre_id
         LEFT JOIN usuarios u_asig ON s.empleado_asignado_id = u_asig.user_identificacion
         LEFT JOIN usuarios u_crea ON s.created_by = u_crea.user_identificacion
-        LEFT JOIN (
-            SELECT a.solicitud_id, c2.coordinacion_id AS coord_destino, a.empleado_id AS redirigido_por_id
-            FROM auditoria a
-            LEFT JOIN coordinacion c2 ON c2.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(a.detalles, '$.coordinacion_destino'))
-            WHERE a.auditoria_id IN (
-                SELECT MAX(a2.auditoria_id)
-                FROM auditoria a2
-                WHERE a2.solicitud_id = a.solicitud_id
-                  AND (a2.accion_codigo IN " . auditoriaSqlInCodigosRedireccion() . " OR a2.accion_descripcion LIKE '%redirigido%')
-            )
-        ) au ON au.solicitud_id = s.solicitud_id
+        " . trim(cneSqlLeftJoinAuditoriaUltimaRedireccion()) . "
         LEFT JOIN usuarios u_redir ON au.redirigido_por_id = u_redir.user_identificacion
         " . ($esFiltroVencida ? trim(cneSqlJoinRecibidoCaracasPorSolicitud($db)) : '') . "
         WHERE $coordWhere
@@ -120,7 +124,7 @@ try {
         if ($esFiltroVencida) {
             $sql .= ' AND ' . cneSqlCondicionVencidaEfectiva();
         } elseif ($estado === 'redirigida') {
-            $sql .= " AND au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid";
+            $sql .= " AND au.coord_destino IS NOT NULL AND (au.coord_origen_id = :cid OR (au.coord_origen_id IS NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid))";
         } elseif ($estado === 'en_revision') {
             $sql .= " AND s.solicitud_estado = 'en_revision' AND (au.coord_destino IS NULL OR COALESCE(au.coord_destino, $coordSelect) = :cid)";
         } else {

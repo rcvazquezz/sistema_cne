@@ -38,10 +38,21 @@ try {
         echo json_encode(['success' => false, 'message' => 'Trámite no encontrado']);
         exit;
     }
-    $tramite_id = (int)$row['tramite_id'];
+    $tramite_id_operativo = (int) $row['tramite_id'];
+    $tramite_id = (int) cneResolverTramiteIdParaRequisitos($db, $solicitud_id);
+    if ($tramite_id < 1) {
+        $tramite_id = $tramite_id_operativo;
+    }
     $estado_actual = $row['solicitud_estado'] ?? null;
+    $hasCoordActual = false;
+    try {
+        $chk = $db->query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'solicitudes' AND COLUMN_NAME = 'coordinacion_actual_id'");
+        $hasCoordActual = (bool) $chk->fetchColumn();
+    } catch (Exception $e) {
+    }
+    $coordExprAcceso = cneSqlCoordinacionEfectivaSolicitud($hasCoordActual);
     $stmt = $db->prepare("
-        SELECT COALESCE(au.coord_destino, t.coordinacion_id) AS coord_actual
+        SELECT {$coordExprAcceso} AS coord_actual
         FROM solicitudes s
         JOIN tramite t ON s.tramite_id = t.tramite_id
         LEFT JOIN (

@@ -18,6 +18,7 @@ $tramite_id = intval($_GET['tramite_id']);
 
 try {
     $db = getDB();
+    // Solo catálogo por tramite_id; sin filtrar por coordinación del usuario ni auditoría.
     $stmt = $db->prepare("
         SELECT requisito_id as id, requisito_nombre as nombre
         FROM requisitos

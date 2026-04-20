@@ -273,6 +273,7 @@ CREATE TABLE IF NOT EXISTS `solicitudes` (
   `codigo_interno` varchar(50) DEFAULT NULL,
   `ciudadano_identificacion` varchar(20) NOT NULL,
   `tramite_id` int NOT NULL,
+  `tramite_id_inicial` int DEFAULT NULL COMMENT 'Catálogo tramite al alta (etiqueta estable); tramite_id puede cambiar al redirigir',
   `coordinacion_actual_id` int DEFAULT NULL COMMENT 'Coordinación actual del trámite (p. ej. tras redirección); el tramite_id sigue definiendo el tipo',
   `solicitud_descripcion` text,
   `solicitud_estado` varchar(20) DEFAULT 'pendiente' COMMENT 'Códigos: pendiente, en_revision (UI En Proceso), aprobada, rechazada, completada, redirigida, vencida, invalidada',

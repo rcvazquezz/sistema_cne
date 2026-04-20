@@ -17,6 +17,9 @@ actualizarSesionUltimaActividad($usuario_id);
 $usuario = obtenerUsuario($usuario_id);
 require_once __DIR__ . '/includes/cne_admin_view_context.php';
 cneAplicarContextoAdminView($usuario);
+/** Admin en Pantallas → Atención al Ciudadano: listado completo del rol OAC + columna creador */
+$isAdminOacSupervision = !empty($_SESSION['is_admin_viewing'])
+    && (int) ($_SESSION['admin_view_target_rol_id'] ?? 0) === 1;
 $coordinacion_nombre = $usuario['coordinacion_nombre'] ?? ($_SESSION['coordinacion_nombre'] ?? '');
 $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id'] ?? null);
 $CNE_RT = ['dashboard' => 'entrada', 'coord' => (int) ($coordinacion_id ?? 0)];
@@ -1380,9 +1383,11 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                             <div class="mb-4 md:mb-0">
                                 <h2 class="text-gray-800 text-lg md:text-xl font-semibold mb-2 flex items-center gap-3">
                                     <i class="fas fa-history text-blue-600"></i> 
-                                    <span>Mis Solicitudes Registradas</span>
+                                    <span><?php echo $isAdminOacSupervision ? 'Solicitudes del rol Atención al Ciudadano' : 'Mis Solicitudes Registradas'; ?></span>
                                 </h2>
-                                <p class="text-sm text-gray-600">Visualiza y gestiona todas las solicitudes registradas en Atención al Ciudadano</p>
+                                <p class="text-sm text-gray-600"><?php echo $isAdminOacSupervision
+                                    ? 'Vista de supervisión: todas las solicitudes creadas por funcionarios con rol Atención al Ciudadano.'
+                                    : 'Visualiza y gestiona todas las solicitudes registradas en Atención al Ciudadano'; ?></p>
                             </div>
                             <div class="bg-white px-4 py-3 rounded-lg shadow-sm">
                                 <div class="flex items-center gap-2">
@@ -1539,6 +1544,11 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             <i class="fas fa-user mr-1"></i> Ciudadano
                                         </th>
+                                        <?php if ($isAdminOacSupervision): ?>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <i class="fas fa-user-tie mr-1"></i> Funcionario creador
+                                        </th>
+                                        <?php endif; ?>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             <i class="fas fa-building mr-1"></i> Coordinación
                                         </th>
@@ -1558,7 +1568,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                                 </thead>
                                 <tbody id="mis-solicitudes-content" class="bg-white divide-y divide-gray-200">
                                     <tr>
-                                        <td colspan="7" class="px-6 py-8 text-center">
+                                        <td colspan="<?php echo $isAdminOacSupervision ? 8 : 7; ?>" class="px-6 py-8 text-center">
                                             <div class="flex flex-col items-center justify-center">
                                                 <div class="loading mb-4"></div>
                                                 <p class="text-gray-500">Cargando solicitudes...</p>
@@ -1719,6 +1729,8 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
 
     <script src="recursos/js/cne_nueva_solicitud_combos_busqueda.js?v=1"></script>
     <script>
+        const CNE_ENTRADA_ADMIN_OAC = <?php echo $isAdminOacSupervision ? 'true' : 'false'; ?>;
+        const CNE_ENTRADA_MIS_SOL_COLSPAN = <?php echo $isAdminOacSupervision ? 8 : 7; ?>;
         // Variables globales
         let tiposTramiteData = {};
         let tramiteParaBuscar = ''; // Variable para almacenar el número de seguimiento temporalmente
@@ -4178,7 +4190,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
             
             if (!container) return;
             
-            container.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center"><div class="flex flex-col items-center justify-center"><div class="loading mb-4"></div><p class="text-gray-500">Cargando solicitudes...</p></div></td></tr>';
+            container.innerHTML = '<tr><td colspan="' + CNE_ENTRADA_MIS_SOL_COLSPAN + '" class="px-6 py-8 text-center"><div class="flex flex-col items-center justify-center"><div class="loading mb-4"></div><p class="text-gray-500">Cargando solicitudes...</p></div></td></tr>';
             
             const filtros = {
                 cedula: document.getElementById('filtro-cedula').value,
@@ -4191,9 +4203,12 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                 fecha_hasta: document.getElementById('filtro-fecha-hasta').value
             };
             
-            const params = new URLSearchParams(filtros).toString();
+            const params = new URLSearchParams(filtros);
+            if (typeof CNE_ENTRADA_ADMIN_OAC !== 'undefined' && CNE_ENTRADA_ADMIN_OAC) {
+                params.set('view_as', 'admin');
+            }
             
-            fetch(`ajax/obtener_mis_solicitudes.php?${params}`)
+            fetch(`ajax/obtener_mis_solicitudes.php?${params.toString()}`)
                 .then(response => response.text())
                 .then(html => {
                     container.innerHTML = html;
@@ -4211,7 +4226,7 @@ $inst_lista_js[] = ['id' => 'otro', 'nombre' => 'Otro...'];
                     if (ultimaActualizacion) ultimaActualizacion.textContent = hora;
                 })
                 .catch(error => {
-                    container.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center"><div class="text-red-500">Error al cargar las solicitudes</div></td></tr>';
+                    container.innerHTML = '<tr><td colspan="' + CNE_ENTRADA_MIS_SOL_COLSPAN + '" class="px-6 py-8 text-center"><div class="text-red-500">Error al cargar las solicitudes</div></td></tr>';
                     if (contador) contador.textContent = '0';
                     if (mostrandoContador) mostrandoContador.textContent = '0';
                     if (totalContador) totalContador.textContent = '0';

@@ -35,9 +35,8 @@ try {
         $hasCoordActual = (bool) $chk->fetchColumn();
     } catch (Exception $e) {
     }
-    $coordExprAcceso = $hasCoordActual
-        ? 'COALESCE(s.coordinacion_actual_id, au.coord_destino, t.coordinacion_id)'
-        : 'COALESCE(au.coord_destino, t.coordinacion_id)';
+    $hasTramiteIdInicial = cneSolicitudesTieneTramiteIdInicial($db);
+    $coordExprAcceso = cneSqlCoordinacionEfectivaSolicitud($hasCoordActual);
     $stmt = $db->prepare("
         SELECT 
             {$coordExprAcceso} AS coord_actual,
@@ -137,7 +136,7 @@ try {
             exit;
         }
         $stmt = $db->prepare("
-            SELECT s.solicitud_numero, t.tramite_nombre, t.coordinacion_id AS coord_origen
+            SELECT s.solicitud_numero, t.tramite_nombre, t.coordinacion_id AS coord_origen, s.tramite_id AS tramite_id_actual
             FROM solicitudes s
             JOIN tramite t ON s.tramite_id = t.tramite_id
             WHERE s.solicitud_id = :sid
@@ -163,42 +162,87 @@ try {
                 throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar estado'));
             }
         } elseif ($accion === 'redirigir' && $nuevo_tramite_id_redirect) {
+            $tidPrevRedir = (int) (($meta_redir_prefetch['tramite_id_actual'] ?? 0));
             if ($hasCoordActual) {
-                $stmt = $db->prepare("
-                    UPDATE solicitudes SET
-                        tramite_id = :tid,
-                        solicitud_estado = :estado,
-                        empleado_asignado_id = NULL,
-                        codigo_interno = :codigo,
-                        solicitud_fecha_completada = :fecha,
-                        coordinacion_actual_id = :caid
-                    WHERE solicitud_id = :id
-                ");
-                $ok = $stmt->execute([
-                    ':tid' => $nuevo_tramite_id_redirect,
-                    ':estado' => $estado,
-                    ':codigo' => $codigo_interno ?: null,
-                    ':fecha' => $fecha_completada,
-                    ':caid' => (int) $destino_coordinacion_id,
-                    ':id' => $solicitud_id
-                ]);
+                if ($hasTramiteIdInicial) {
+                    $stmt = $db->prepare("
+                        UPDATE solicitudes SET
+                            tramite_id = :tid,
+                            tramite_id_inicial = COALESCE(tramite_id_inicial, :tid_prev),
+                            solicitud_estado = :estado,
+                            empleado_asignado_id = NULL,
+                            codigo_interno = :codigo,
+                            solicitud_fecha_completada = :fecha,
+                            coordinacion_actual_id = :caid
+                        WHERE solicitud_id = :id
+                    ");
+                    $ok = $stmt->execute([
+                        ':tid' => $nuevo_tramite_id_redirect,
+                        ':tid_prev' => $tidPrevRedir > 0 ? $tidPrevRedir : null,
+                        ':estado' => $estado,
+                        ':codigo' => $codigo_interno ?: null,
+                        ':fecha' => $fecha_completada,
+                        ':caid' => (int) $destino_coordinacion_id,
+                        ':id' => $solicitud_id
+                    ]);
+                } else {
+                    $stmt = $db->prepare("
+                        UPDATE solicitudes SET
+                            tramite_id = :tid,
+                            solicitud_estado = :estado,
+                            empleado_asignado_id = NULL,
+                            codigo_interno = :codigo,
+                            solicitud_fecha_completada = :fecha,
+                            coordinacion_actual_id = :caid
+                        WHERE solicitud_id = :id
+                    ");
+                    $ok = $stmt->execute([
+                        ':tid' => $nuevo_tramite_id_redirect,
+                        ':estado' => $estado,
+                        ':codigo' => $codigo_interno ?: null,
+                        ':fecha' => $fecha_completada,
+                        ':caid' => (int) $destino_coordinacion_id,
+                        ':id' => $solicitud_id
+                    ]);
+                }
             } else {
-                $stmt = $db->prepare("
-                    UPDATE solicitudes SET
-                        tramite_id = :tid,
-                        solicitud_estado = :estado,
-                        empleado_asignado_id = NULL,
-                        codigo_interno = :codigo,
-                        solicitud_fecha_completada = :fecha
-                    WHERE solicitud_id = :id
-                ");
-                $ok = $stmt->execute([
-                    ':tid' => $nuevo_tramite_id_redirect,
-                    ':estado' => $estado,
-                    ':codigo' => $codigo_interno ?: null,
-                    ':fecha' => $fecha_completada,
-                    ':id' => $solicitud_id
-                ]);
+                if ($hasTramiteIdInicial) {
+                    $stmt = $db->prepare("
+                        UPDATE solicitudes SET
+                            tramite_id = :tid,
+                            tramite_id_inicial = COALESCE(tramite_id_inicial, :tid_prev),
+                            solicitud_estado = :estado,
+                            empleado_asignado_id = NULL,
+                            codigo_interno = :codigo,
+                            solicitud_fecha_completada = :fecha
+                        WHERE solicitud_id = :id
+                    ");
+                    $ok = $stmt->execute([
+                        ':tid' => $nuevo_tramite_id_redirect,
+                        ':tid_prev' => $tidPrevRedir > 0 ? $tidPrevRedir : null,
+                        ':estado' => $estado,
+                        ':codigo' => $codigo_interno ?: null,
+                        ':fecha' => $fecha_completada,
+                        ':id' => $solicitud_id
+                    ]);
+                } else {
+                    $stmt = $db->prepare("
+                        UPDATE solicitudes SET
+                            tramite_id = :tid,
+                            solicitud_estado = :estado,
+                            empleado_asignado_id = NULL,
+                            codigo_interno = :codigo,
+                            solicitud_fecha_completada = :fecha
+                        WHERE solicitud_id = :id
+                    ");
+                    $ok = $stmt->execute([
+                        ':tid' => $nuevo_tramite_id_redirect,
+                        ':estado' => $estado,
+                        ':codigo' => $codigo_interno ?: null,
+                        ':fecha' => $fecha_completada,
+                        ':id' => $solicitud_id
+                    ]);
+                }
             }
             if (!$ok) {
                 $err = $stmt->errorInfo();

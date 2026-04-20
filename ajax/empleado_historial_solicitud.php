@@ -46,10 +46,10 @@ try {
     } catch (Exception $e) {
         $hasCoordActual = false;
     }
-    $coordExpr = $hasCoordActual ? 's.coordinacion_actual_id' : 't.coordinacion_id';
+    $coordExpr = cneSqlCoordinacionEfectivaSolicitud($hasCoordActual);
     $stmt = $db->prepare("
         SELECT 
-            COALESCE(au.coord_destino, $coordExpr) AS coord_actual
+            $coordExpr AS coord_actual
         FROM solicitudes s
         JOIN tramite t ON s.tramite_id = t.tramite_id
         LEFT JOIN (
@@ -73,6 +73,7 @@ try {
     $stmt->execute([':sid' => $solicitud_id]);
     $rowChk = $stmt->fetch();
     $coordActual = $rowChk ? (int) $rowChk['coord_actual'] : 0;
+    $miUid = $_SESSION['user_id'];
     $permitir = false;
     if ($coordActual === (int) $mi_coordinacion_id) {
         $permitir = true;
@@ -87,6 +88,23 @@ try {
         ");
         $stmt2->execute([':sid' => $solicitud_id, ':cid' => $mi_coordinacion_id]);
         $permitir = (bool) $stmt2->fetchColumn();
+    }
+    if (!$permitir) {
+        $stmtInv = $db->prepare("
+            SELECT 1 FROM solicitudes s
+            WHERE s.solicitud_id = :sid
+              AND (
+                s.created_by = :uid
+                OR s.empleado_asignado_id = :uid
+                OR EXISTS (
+                    SELECT 1 FROM auditoria a
+                    WHERE a.solicitud_id = s.solicitud_id AND a.empleado_id = :uid
+                )
+              )
+            LIMIT 1
+        ");
+        $stmtInv->execute([':sid' => $solicitud_id, ':uid' => $miUid]);
+        $permitir = (bool) $stmtInv->fetchColumn();
     }
     if (!$permitir) {
         echo json_encode(['success' => false, 'message' => 'Acceso denegado: este trámite no pertenece a su coordinación']);

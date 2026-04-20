@@ -552,6 +552,11 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             </header>
             <script>
                 const MI_COORDINACION_ID = <?php echo $coordinacion_id ? (int)$coordinacion_id : 'null'; ?>;
+                /** Trámite efectivamente en otra coordinación: solo lectura (no usar estado "redirigida" como criterio). */
+                function tramiteFueraDeMiCoordinacion(s) {
+                    if (!s) return false;
+                    return !!(MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
+                }
                 /** Igual que plazo en rowHistorial / backend (cneEmpleadoDiasPlazoVencimientoTramite). */
                 function esTramiteVencidoNoGestion(s) {
                     if (!s) return false;
@@ -3464,7 +3469,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         }
 
         function cardSolicitud(s) {
-            const noGestionableCard = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
+            const noGestionableCard = tramiteFueraDeMiCoordinacion(s);
             const vencido = esTramiteVencidoNoGestion(s);
             const soloDetallesCard = noGestionableCard || s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || vencido;
             let estadoClass = 'status-pendiente';
@@ -3596,7 +3601,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                     default: estadoClass = 'status-pendiente'; estadoText = (s.solicitud_estado && typeof s.solicitud_estado === 'string') ? (s.solicitud_estado.charAt(0).toUpperCase() + s.solicitud_estado.slice(1).toLowerCase().replace(/_/g, ' ')) : 'Pendiente'; break;
                 }
             }
-            const noGestionable = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
+            const noGestionable = tramiteFueraDeMiCoordinacion(s);
             const soloDetalles = noGestionable || s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || vencido;
             const rowOpacity = noGestionable ? 'opacity-75' : '';
             const tramiteEsc = escapeHtmlHistorial(s.tramite_nombre || '');
@@ -3640,14 +3645,14 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 <div><p class="text-sm text-gray-500">Cédula</p><p class="font-mono">${typeof cneMayusCiudadanoTexto === 'function' ? cneMayusCiudadanoTexto(s.ciudadano_identificacion || '') : (s.ciudadano_identificacion || '')}</p></div>
                 <div><p class="text-sm text-gray-500">Trámite</p><p class="font-semibold">${s.tramite_nombre}</p></div>
             `;
-            cargarDetalles(s.solicitud_id, s.tramite_id);
+            cargarDetalles(s.solicitud_id, (s.tramite_id_requisitos != null && s.tramite_id_requisitos !== '') ? s.tramite_id_requisitos : s.tramite_id);
             // Reset botones a deshabilitado visualmente
             ['btn-iniciar','btn-completar','btn-redirigir','btn-invalidar','btn-enviar','btn-recibir'].forEach(id => {
                 const b = document.getElementById(id);
                 if (b) { b.disabled = true; b.classList.add('opacity-50','cursor-not-allowed'); }
             });
             // Completada, invalidada, vencida / vencido por plazo o sin permiso: ocultar acciones de gestión
-            const noGestionable = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
+            const noGestionable = tramiteFueraDeMiCoordinacion(s);
             if (s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || noGestionable || esTramiteVencidoNoGestion(s)) {
                 ['btn-iniciar','btn-completar','btn-redirigir','btn-invalidar'].forEach(id => {
                     const b = document.getElementById(id);
@@ -3747,14 +3752,17 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             })
             .then(r => r.json())
             .then(d => {
+                const tidParaReq = (d.success && d.tramite_id_requisitos != null && d.tramite_id_requisitos !== '')
+                    ? d.tramite_id_requisitos
+                    : tramiteId;
                 if (d.success) {
                     if (d.codigo_interno) {
                         document.getElementById('modal-codigo').value = d.codigo_interno || '';
                     }
                     const seleccionados = Array.isArray(d.requisitos_aprobados) ? d.requisitos_aprobados : [];
-                    cargarRequisitos(tramiteId, seleccionados);
+                    cargarRequisitos(tidParaReq, seleccionados);
                 } else {
-                    cargarRequisitos(tramiteId, []);
+                    cargarRequisitos(tidParaReq, []);
                 }
             })
             .catch(() => cargarRequisitos(tramiteId, []));
@@ -3818,7 +3826,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const btnRecibir = document.getElementById('btn-recibir');
             const toggle = () => {
                 const ok = (obs.value || '').trim().length >= 10;
-                const deshabilitar = (currentSolicitud?.solicitud_estado === 'redirigida') || (currentSolicitud?.solicitud_estado === 'invalidada') || (MI_COORDINACION_ID && String(currentSolicitud?.coordinacion_id) !== String(MI_COORDINACION_ID)) || esTramiteVencidoNoGestion(currentSolicitud);
+                const deshabilitar = (currentSolicitud?.solicitud_estado === 'invalidada') || tramiteFueraDeMiCoordinacion(currentSolicitud) || esTramiteVencidoNoGestion(currentSolicitud);
                 botonesGestion.forEach(b => {
                     const disabled = deshabilitar || !ok;
                     b.disabled = disabled;

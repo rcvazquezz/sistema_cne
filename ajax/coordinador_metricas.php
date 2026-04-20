@@ -32,22 +32,23 @@ try {
         $hasCoordActual = (bool)$chk->fetchColumn();
     } catch (Exception $e) {}
 
-    $coordWhere = $hasCoordActual
-        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
-        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
+    $coordWhere = cneSqlWhereCoordinacionVinculaSolicitud($hasCoordActual);
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
-    $auSubquery = "
-        LEFT JOIN (
-            SELECT a.solicitud_id, c2.coordinacion_id AS coord_destino
-            FROM auditoria a
-            LEFT JOIN coordinacion c2 ON c2.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(a.detalles, '$.coordinacion_destino'))
-            WHERE a.auditoria_id IN (
-                SELECT MAX(a2.auditoria_id) FROM auditoria a2
-                WHERE a2.solicitud_id = a.solicitud_id
-                AND (a2.accion_codigo IN " . auditoriaSqlInCodigosRedireccion() . " OR a2.accion_descripcion LIKE '%redirigido%')
-            )
-        ) au ON au.solicitud_id = s.solicitud_id
+    $tieneTramiteIdInicial = cneSolicitudesTieneTramiteIdInicial($db);
+    $tidEtqSql = cneSqlExpresionTramiteIdEtiqueta($tieneTramiteIdInicial);
+    $joinTramEtq = "
+        LEFT JOIN tramite t_etq ON t_etq.tramite_id = $tidEtqSql
+        LEFT JOIN tramite tp_etq ON tp_etq.tramite_id = t_etq.tramite_padre_id
+        LEFT JOIN tramite tp_op ON tp_op.tramite_id = t.tramite_padre_id
     ";
+    $fragFrom = '
+FROM solicitudes s
+    ' . trim(cneSqlJoinAuditoriaTramiteIdCreacion()) . '
+    JOIN tramite t ON s.tramite_id = t.tramite_id
+    ' . $joinTramEtq . '
+    ' . trim(cneSqlLeftJoinAuditoriaUltimaRedireccion()) . '
+';
+    $condSalidaOficina = "au.coord_destino IS NOT NULL AND (au.coord_origen_id = :cid OR (au.coord_origen_id IS NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid))";
     $baseWhere = " WHERE $coordWhere";
     $params = [':cid' => $cid];
 
@@ -70,7 +71,7 @@ try {
         if ($esFiltroVencidaM) {
             $baseWhere .= ' AND ' . cneSqlCondicionVencidaEfectiva();
         } elseif ($estado === 'redirigida') {
-            $baseWhere .= " AND au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid";
+            $baseWhere .= " AND $condSalidaOficina";
         } elseif ($estado === 'en_revision') {
             $baseWhere .= " AND s.solicitud_estado = 'en_revision' AND (au.coord_destino IS NULL OR COALESCE(au.coord_destino, $coordSelect) = :cid)";
         } else {
@@ -107,7 +108,13 @@ try {
     }
 
     $joinRecCoord = cneSqlJoinRecibidoCaracasPorSolicitud($db);
-    $baseSql = "FROM solicitudes s JOIN tramite t ON s.tramite_id = t.tramite_id $auSubquery $joinRecCoord $baseWhere";
+    $baseSql = $fragFrom . $joinRecCoord . $baseWhere;
+    $joinUsersCarga = "
+        LEFT JOIN usuarios u ON COALESCE(s.empleado_asignado_id, s.created_by) = u.user_identificacion
+        LEFT JOIN coordinacion coord ON u.coordinacion_id = coord.coordinacion_id
+        LEFT JOIN usuarios ur_redir ON au.redirigido_por_id = ur_redir.user_identificacion
+    ";
+    $baseSqlCarga = $fragFrom . $joinRecCoord . $joinUsersCarga . $baseWhere;
 
     $kpis = [];
     $stmt = $db->prepare("SELECT COUNT(*) as total $baseSql");
@@ -138,7 +145,7 @@ try {
     $stmt->execute($params);
     $kpis['vencidos'] = (int)$stmt->fetchColumn();
 
-    $stmt = $db->prepare("SELECT COUNT(*) as c $baseSql AND au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid");
+    $stmt = $db->prepare("SELECT COUNT(*) as c $baseSql AND $condSalidaOficina");
     $stmt->execute($params);
     $kpis['redirigidos'] = (int)$stmt->fetchColumn();
 
@@ -146,7 +153,7 @@ try {
     $stmt->execute($params);
     $kpis['invalidados'] = (int) $stmt->fetchColumn();
 
-    $condRedCoord = "au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid";
+    $condRedCoord = $condSalidaOficina;
     $caseCoord = cneSqlCaseEstadoParaReporte($condRedCoord);
     $stmt = $db->prepare("
         SELECT
@@ -178,10 +185,18 @@ try {
     $pushBar($chartBar, 'Redirigida', (int)($porEstadoMap['redirigida'] ?? 0), '#8b5cf6');
     $pushBar($chartBar, 'Vencidos', $vencChart, '#6c757d');
 
+    $caseNombreTipo = "CASE 
+        WHEN t_etq.tramite_padre_id IS NOT NULL AND tp_etq.tramite_id IS NOT NULL 
+            THEN CONCAT(tp_etq.tramite_nombre, ' — ', t_etq.tramite_nombre)
+        WHEN t_etq.tramite_id IS NOT NULL THEN t_etq.tramite_nombre
+        WHEN t.tramite_padre_id IS NOT NULL AND tp_op.tramite_id IS NOT NULL 
+            THEN CONCAT(tp_op.tramite_nombre, ' — ', t.tramite_nombre)
+        ELSE t.tramite_nombre
+    END";
     $stmt = $db->prepare("
-        SELECT t.tramite_nombre as nombre, COUNT(*) as cantidad
+        SELECT ($caseNombreTipo) as nombre, COUNT(*) as cantidad
         $baseSql
-        GROUP BY t.tramite_id
+        GROUP BY nombre
         ORDER BY cantidad DESC
     ");
     $stmt->execute($params);
@@ -195,25 +210,36 @@ try {
         $chartPie['data'][] = (int)$r['cantidad'];
     }
 
-    // Carga de trabajo por empleado: agrupar Oficina de Atención al Ciudadano; individual para el resto
+    // Carga de trabajo: asignado/creador; si el trámite ya salió y el redireccionador es de esta coord, contar a ese funcionario
     $stmt = $db->prepare("
         SELECT
             CASE
                 WHEN coord.coordinacion_nombre LIKE '%Oficina de Atención%' OR coord.coordinacion_nombre LIKE '%Atención al Ciudadano%'
                 THEN 'Oficina de Atención al Ciudadano'
+                WHEN au.redirigido_por_id IS NOT NULL
+                    AND ur_redir.coordinacion_id = :cid
+                    AND (
+                        u.user_identificacion IS NULL
+                        OR u.coordinacion_id IS NULL
+                        OR u.coordinacion_id <> :cid
+                    )
+                    THEN TRIM(CONCAT(COALESCE(ur_redir.user_nombres, ''), ' ', COALESCE(ur_redir.user_apellidos, '')))
                 ELSE COALESCE(CONCAT(u.user_nombres, ' ', u.user_apellidos), 'Sin asignar')
             END AS identificador,
             COUNT(*) as cantidad
-        FROM solicitudes s
-        JOIN tramite t ON s.tramite_id = t.tramite_id
-        $auSubquery
-        LEFT JOIN usuarios u ON COALESCE(s.empleado_asignado_id, s.created_by) = u.user_identificacion
-        LEFT JOIN coordinacion coord ON u.coordinacion_id = coord.coordinacion_id
-        $baseWhere
+        $baseSqlCarga
         GROUP BY
             CASE
                 WHEN coord.coordinacion_nombre LIKE '%Oficina de Atención%' OR coord.coordinacion_nombre LIKE '%Atención al Ciudadano%'
                 THEN 'Oficina de Atención al Ciudadano'
+                WHEN au.redirigido_por_id IS NOT NULL
+                    AND ur_redir.coordinacion_id = :cid
+                    AND (
+                        u.user_identificacion IS NULL
+                        OR u.coordinacion_id IS NULL
+                        OR u.coordinacion_id <> :cid
+                    )
+                    THEN TRIM(CONCAT(COALESCE(ur_redir.user_nombres, ''), ' ', COALESCE(ur_redir.user_apellidos, '')))
                 ELSE COALESCE(CONCAT(u.user_nombres, ' ', u.user_apellidos), 'Sin asignar')
             END
         ORDER BY cantidad DESC

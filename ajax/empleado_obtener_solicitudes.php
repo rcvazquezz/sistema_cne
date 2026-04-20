@@ -38,7 +38,9 @@ try {
     } catch (Exception $e) {
         $hasCoordActual = false;
     }
-    $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
+    $coordSql = cneSqlCoordinacionEfectivaSolicitud($hasCoordActual);
+    $tieneTramiteIdInicial = cneSolicitudesTieneTramiteIdInicial($db);
+    $tidEtqSql = cneSqlExpresionTramiteIdEtiqueta($tieneTramiteIdInicial);
     $audFechaCol = 'auditoria_created_at';
     try {
         $chk2 = $db->query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auditoria' AND COLUMN_NAME = 'fecha_creacion'");
@@ -52,7 +54,7 @@ try {
             s.solicitud_id,
             s.solicitud_numero,
             CASE 
-                WHEN COALESCE(au.coord_destino, $coordSelect) <> :coord_id AND au.coord_destino IS NOT NULL 
+                WHEN ($coordSql) <> :coord_id AND au.coord_destino IS NOT NULL 
                     THEN 'redirigida'
                 ELSE s.solicitud_estado
             END AS solicitud_estado,
@@ -65,9 +67,18 @@ try {
             CONCAT(c.ciudadano_nombres, ' ', c.ciudadano_apellidos) as ciudadano_nombre,
             c.ciudadano_genero,
             t.tramite_id,
-            t.tramite_nombre,
+            COALESCE(t_etq.tramite_id, t.tramite_id) AS tramite_id_requisitos,
+            CASE 
+                WHEN t_etq.tramite_padre_id IS NOT NULL AND tp_etq.tramite_id IS NOT NULL 
+                    THEN CONCAT(tp_etq.tramite_nombre, ' — ', t_etq.tramite_nombre)
+                WHEN t_etq.tramite_id IS NOT NULL THEN t_etq.tramite_nombre
+                WHEN t.tramite_padre_id IS NOT NULL AND tp_op.tramite_id IS NOT NULL 
+                    THEN CONCAT(tp_op.tramite_nombre, ' — ', t.tramite_nombre)
+                ELSE t.tramite_nombre
+            END AS tramite_nombre,
             t.tramite_padre_id,
-            COALESCE(au.coord_destino, $coordSelect) AS coordinacion_id,
+            t_etq.coordinacion_id AS coordinacion_origen,
+            ($coordSql) AS coordinacion_id,
             CASE 
                 WHEN env.last_env_id IS NOT NULL AND (rec.last_rec_id IS NULL OR env.last_env_id > rec.last_rec_id) THEN 1
                 ELSE 0
@@ -75,7 +86,11 @@ try {
             DATE_FORMAT(recdate.$audFechaCol, '%Y-%m-%d %H:%i:%s') AS recibido_fecha
         FROM solicitudes s
         JOIN ciudadanos c ON s.ciudadano_identificacion = c.ciudadano_identificacion
+        " . trim(cneSqlJoinAuditoriaTramiteIdCreacion()) . "
         JOIN tramite t ON s.tramite_id = t.tramite_id
+        LEFT JOIN tramite t_etq ON t_etq.tramite_id = $tidEtqSql
+        LEFT JOIN tramite tp_etq ON tp_etq.tramite_id = t_etq.tramite_padre_id
+        LEFT JOIN tramite tp_op ON tp_op.tramite_id = t.tramite_padre_id
         LEFT JOIN (
             SELECT a.solicitud_id,
                    c2.coordinacion_id AS coord_destino
@@ -110,10 +125,33 @@ try {
         $sql .= trim(cneSqlJoinRecibidoCaracasPorSolicitud($db));
     }
     
-    $params = [':coord_id' => $coordinacion_id];
-    
-    if ($filtro_estado) {
-        $sql .= " WHERE COALESCE(au.coord_destino, $coordSelect) = :coord_id";
+    $visibilidadSql = "(
+        ($coordSql) = :coord_id
+        OR EXISTS (
+            SELECT 1
+            FROM auditoria a
+            JOIN usuarios u ON u.user_identificacion = a.empleado_id
+            WHERE a.solicitud_id = s.solicitud_id
+              AND u.coordinacion_id = :coord_id
+        )
+        OR s.created_by = :uid_m
+        OR s.empleado_asignado_id = :uid_m
+        OR EXISTS (
+            SELECT 1 FROM auditoria ax
+            WHERE ax.solicitud_id = s.solicitud_id
+              AND ax.empleado_id = :uid_m
+        )
+    )";
+    $params = [
+        ':coord_id' => $coordinacion_id,
+        ':uid_m' => $usuario_id,
+    ];
+    $esColaPendientes = $filtro_estado !== '' && strcasecmp(trim($filtro_estado), 'pendiente') === 0;
+
+    if ($esColaPendientes) {
+        $sql .= " WHERE ($coordSql) = :coord_id AND s.solicitud_estado = 'pendiente'";
+    } elseif ($filtro_estado) {
+        $sql .= " WHERE ($visibilidadSql)";
         if ($esFiltroVencida) {
             $sql .= ' AND ' . cneSqlCondicionVencidaEfectiva();
         } else {
@@ -121,14 +159,7 @@ try {
             $params[':estado'] = $filtro_estado;
         }
     } else {
-        $sql .= " WHERE (COALESCE(au.coord_destino, $coordSelect) = :coord_id";
-        $sql .= " OR EXISTS (";
-        $sql .= "     SELECT 1";
-        $sql .= "     FROM auditoria a";
-        $sql .= "     JOIN usuarios u ON u.user_identificacion = a.empleado_id";
-        $sql .= "     WHERE a.solicitud_id = s.solicitud_id";
-        $sql .= "       AND u.coordinacion_id = :coord_id";
-        $sql .= " ))";
+        $sql .= " WHERE ($visibilidadSql)";
     }
     
     if ($filtro_cedula) {

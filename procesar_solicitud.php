@@ -319,40 +319,78 @@ try {
     // Si es trámite inmediato, establecer fecha de completado
     $fecha_completada = ($tipo_solicitud === 'inmediato') ? date('Y-m-d H:i:s') : null;
     
-    $stmt = $db->prepare("
-        INSERT INTO solicitudes (
-            solicitud_numero,
-            ciudadano_identificacion,
-            tramite_id,
-            solicitud_descripcion,
-            solicitud_estado,
-            solicitud_fecha_solicitud,
-            created_by,
-            empleado_asignado_id,
-            solicitud_fecha_completada
-        ) VALUES (
-            :numero,
-            :ciudadano_id,
-            :tramite_id,
-            :descripcion,
-            :estado,
-            NOW(),
-            :created_by,
-            :empleado_asignado,
-            :fecha_completada
-        )
-    ");
-    
-    $stmt->execute([
-        ':numero' => $solicitud_numero,
-        ':ciudadano_id' => $cedula_completa,
-        ':tramite_id' => $_POST['tipo_tramite_id'],
-        ':descripcion' => $descripcion,
-        ':estado' => $estado,
-        ':created_by' => $_SESSION['user_id'],
-        ':empleado_asignado' => $_SESSION['user_id'],
-        ':fecha_completada' => $fecha_completada
-    ]);
+    if (cneSolicitudesTieneTramiteIdInicial($db)) {
+        $stmt = $db->prepare("
+            INSERT INTO solicitudes (
+                solicitud_numero,
+                ciudadano_identificacion,
+                tramite_id,
+                tramite_id_inicial,
+                solicitud_descripcion,
+                solicitud_estado,
+                solicitud_fecha_solicitud,
+                created_by,
+                empleado_asignado_id,
+                solicitud_fecha_completada
+            ) VALUES (
+                :numero,
+                :ciudadano_id,
+                :tramite_id,
+                :tramite_id_inicial,
+                :descripcion,
+                :estado,
+                NOW(),
+                :created_by,
+                :empleado_asignado,
+                :fecha_completada
+            )
+        ");
+        $stmt->execute([
+            ':numero' => $solicitud_numero,
+            ':ciudadano_id' => $cedula_completa,
+            ':tramite_id' => $_POST['tipo_tramite_id'],
+            ':tramite_id_inicial' => $_POST['tipo_tramite_id'],
+            ':descripcion' => $descripcion,
+            ':estado' => $estado,
+            ':created_by' => $_SESSION['user_id'],
+            ':empleado_asignado' => $_SESSION['user_id'],
+            ':fecha_completada' => $fecha_completada
+        ]);
+    } else {
+        $stmt = $db->prepare("
+            INSERT INTO solicitudes (
+                solicitud_numero,
+                ciudadano_identificacion,
+                tramite_id,
+                solicitud_descripcion,
+                solicitud_estado,
+                solicitud_fecha_solicitud,
+                created_by,
+                empleado_asignado_id,
+                solicitud_fecha_completada
+            ) VALUES (
+                :numero,
+                :ciudadano_id,
+                :tramite_id,
+                :descripcion,
+                :estado,
+                NOW(),
+                :created_by,
+                :empleado_asignado,
+                :fecha_completada
+            )
+        ");
+        $stmt->execute([
+            ':numero' => $solicitud_numero,
+            ':ciudadano_id' => $cedula_completa,
+            ':tramite_id' => $_POST['tipo_tramite_id'],
+            ':descripcion' => $descripcion,
+            ':estado' => $estado,
+            ':created_by' => $_SESSION['user_id'],
+            ':empleado_asignado' => $_SESSION['user_id'],
+            ':fecha_completada' => $fecha_completada
+        ]);
+    }
     
     $solicitud_id = $db->lastInsertId();
     

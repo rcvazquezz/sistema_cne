@@ -190,7 +190,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                             <option value="pendiente">Pendiente</option>
                             <option value="en_revision">En Proceso</option>
                             <option value="completada">Completada</option>
-                            <option value="redirigida">Redirigida</option>
+                            <option value="redirigida">Redirigido</option>
                             <option value="vencida">Vencido</option>
                             <option value="invalidada">Invalidada</option>
                         </select>
@@ -295,7 +295,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
                                     <option value="pendiente">Pendiente</option>
                                     <option value="en_revision">En Proceso</option>
                                     <option value="completada">Completada</option>
-                                    <option value="redirigida">Redirigida</option>
+                                    <option value="redirigida">Redirigido</option>
                                     <option value="vencida">Vencido</option>
                                     <option value="invalidada">Invalidada</option>
                                 </select>
@@ -516,7 +516,7 @@ $coordinacion_id = $usuario['coordinacion_id'] ?? ($_SESSION['acoordinacion_id']
     </div>
 
     <script>
-        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigida', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO', invalidada: 'Invalidada' };
+        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigido', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO', invalidada: 'Invalidada' };
         const estClass = { pendiente: 'status-pendiente', en_revision: 'status-proceso', completada: 'status-completado', redirigida: 'status-redirigido', aprobada: 'status-proceso', rechazada: 'status-vencido', vencida: 'status-vencido', invalidada: 'status-invalidada' };
         const sidebar = document.getElementById('sidebar');
         const menuBtn = document.getElementById('menu-btn');

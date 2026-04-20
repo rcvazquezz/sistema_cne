@@ -822,6 +822,131 @@ function cneSqlCondicionVencidaEfectiva(): string {
         ))";
 }
 
+/**
+ * Coordinación efectiva del trámite (destino tras redirección, columna solicitudes o catálogo).
+ * Requiere alias s, t y subconsulta au (última redirección) como en empleado_obtener_solicitudes.
+ */
+function cneSqlCoordinacionEfectivaSolicitud(bool $hasCoordActual): string
+{
+    return $hasCoordActual
+        ? 'COALESCE(s.coordinacion_actual_id, au.coord_destino, t.coordinacion_id)'
+        : 'COALESCE(au.coord_destino, t.coordinacion_id)';
+}
+
+/**
+ * ¿Existe tramite_id_inicial en solicitudes? (ID del catálogo al crear la solicitud; no cambia al redirigir.)
+ */
+function cneSolicitudesTieneTramiteIdInicial(PDO $db): bool
+{
+    try {
+        $chk = $db->query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'solicitudes' AND COLUMN_NAME = 'tramite_id_inicial'");
+
+        return (bool) $chk->fetchColumn();
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * ID de trámite usado solo para mostrar nombre/padre (definición original o primera auditoría de creación).
+ * Requiere alias s y LEFT JOIN aud_tram_cre (ver cneSqlJoinAuditoriaTramiteIdCreacion).
+ */
+function cneSqlExpresionTramiteIdEtiqueta(bool $tieneColumnaInicial): string
+{
+    if ($tieneColumnaInicial) {
+        return 'COALESCE(s.tramite_id_inicial, aud_tram_cre.tid_creacion, s.tramite_id)';
+    }
+
+    return 'COALESCE(aud_tram_cre.tid_creacion, s.tramite_id)';
+}
+
+/**
+ * Primera auditoría SOLICITUD_CREADA / COMPLETADA con tramite_id en detalles.
+ */
+function cneSqlJoinAuditoriaTramiteIdCreacion(): string
+{
+    return '
+        LEFT JOIN (
+            SELECT a.solicitud_id,
+                   NULLIF(CAST(JSON_UNQUOTE(JSON_EXTRACT(a.detalles, \'$.tramite_id\')) AS UNSIGNED), 0) AS tid_creacion
+            FROM auditoria a
+            INNER JOIN (
+                SELECT solicitud_id, MIN(auditoria_id) AS min_aid
+                FROM auditoria
+                WHERE accion_codigo IN (\'SOLICITUD_CREADA\', \'SOLICITUD_COMPLETADA\')
+                GROUP BY solicitud_id
+            ) fc ON fc.min_aid = a.auditoria_id
+        ) aud_tram_cre ON aud_tram_cre.solicitud_id = s.solicitud_id
+    ';
+}
+
+/**
+ * Catálogo tramite_id para requisitos (misma regla que nombre estable: alta / auditoría, no el remapeo al redirigir).
+ */
+function cneResolverTramiteIdParaRequisitos(PDO $db, int $solicitud_id): int
+{
+    if ($solicitud_id < 1) {
+        return 0;
+    }
+    $tiene = cneSolicitudesTieneTramiteIdInicial($db);
+    $expr = cneSqlExpresionTramiteIdEtiqueta($tiene);
+    $sql = 'SELECT (' . $expr . ') AS tid_req FROM solicitudes s '
+        . trim(cneSqlJoinAuditoriaTramiteIdCreacion())
+        . ' WHERE s.solicitud_id = :sid LIMIT 1';
+    $st = $db->prepare($sql);
+    $st->execute([':sid' => $solicitud_id]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    $tid = $row ? (int) ($row['tid_req'] ?? 0) : 0;
+
+    return $tid > 0 ? $tid : 0;
+}
+
+/**
+ * Última fila de auditoría de redirección por solicitud: destino, quien redirigió y coordinación origen (JSON).
+ * Alias: au. Requiere solicitudes s.
+ */
+function cneSqlLeftJoinAuditoriaUltimaRedireccion(): string
+{
+    return '
+        LEFT JOIN (
+            SELECT a.solicitud_id,
+                   c2.coordinacion_id AS coord_destino,
+                   a.empleado_id AS redirigido_por_id,
+                   c_orig.coordinacion_id AS coord_origen_id
+            FROM auditoria a
+            LEFT JOIN coordinacion c2 ON c2.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(a.detalles, \'$.coordinacion_destino\'))
+            LEFT JOIN coordinacion c_orig ON c_orig.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(a.detalles, \'$.coordinacion_origen\'))
+            WHERE a.auditoria_id IN (
+                SELECT MAX(a2.auditoria_id)
+                FROM auditoria a2
+                WHERE a2.solicitud_id = a.solicitud_id
+                  AND (a2.accion_codigo IN ' . auditoriaSqlInCodigosRedireccion() . ' OR a2.accion_descripcion LIKE \'%redirigido%\')
+            )
+        ) au ON au.solicitud_id = s.solicitud_id
+    ';
+}
+
+/**
+ * La solicitud cuenta para la coordinación :cid por ubicación, destino, auditoría de empleados o origen de redirección.
+ */
+function cneSqlWhereCoordinacionVinculaSolicitud(bool $hasCoordActual): string
+{
+    $redirAud = '(ar.accion_codigo IN ' . auditoriaSqlInCodigosRedireccion() . " OR ar.accion_descripcion LIKE '%redirigido%')";
+    $porOrigenRedir = 'EXISTS (SELECT 1 FROM auditoria ar INNER JOIN coordinacion c_or ON c_or.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(ar.detalles, \'$.coordinacion_origen\')) WHERE ar.solicitud_id = s.solicitud_id AND c_or.coordinacion_id = :cid AND ' . $redirAud . ')';
+
+    $parts = [
+        't.coordinacion_id = :cid',
+        'au.coord_destino = :cid',
+        'EXISTS (SELECT 1 FROM auditoria ax INNER JOIN usuarios ux ON ux.user_identificacion = ax.empleado_id WHERE ax.solicitud_id = s.solicitud_id AND ux.coordinacion_id = :cid)',
+        $porOrigenRedir,
+    ];
+    if ($hasCoordActual) {
+        array_splice($parts, 1, 0, 's.coordinacion_actual_id = :cid');
+    }
+
+    return '(' . implode(' OR ', $parts) . ')';
+}
+
 /** Vacío, NULL o literal N/A (insensible a mayúsculas) — marcador de dato pendiente en ciudadanos. */
 function cneCiudadanoCampoEsNA(?string $v): bool
 {

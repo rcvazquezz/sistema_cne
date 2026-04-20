@@ -36,22 +36,22 @@ try {
     } catch (Exception $e) {
     }
 
-    $coordWhere = $hasCoordActual
-        ? "(t.coordinacion_id = :cid OR s.coordinacion_actual_id = :cid OR au.coord_destino = :cid)"
-        : "(t.coordinacion_id = :cid OR au.coord_destino = :cid)";
+    $coordWhere = cneSqlWhereCoordinacionVinculaSolicitud($hasCoordActual);
     $coordSelect = $hasCoordActual ? "s.coordinacion_actual_id" : "t.coordinacion_id";
-    $auSubquery = "
-        LEFT JOIN (
-            SELECT a.solicitud_id, c2.coordinacion_id AS coord_destino
-            FROM auditoria a
-            LEFT JOIN coordinacion c2 ON c2.coordinacion_nombre = JSON_UNQUOTE(JSON_EXTRACT(a.detalles, '$.coordinacion_destino'))
-            WHERE a.auditoria_id IN (
-                SELECT MAX(a2.auditoria_id) FROM auditoria a2
-                WHERE a2.solicitud_id = a.solicitud_id
-                AND (a2.accion_codigo IN " . auditoriaSqlInCodigosRedireccion() . " OR a2.accion_descripcion LIKE '%redirigido%')
-            )
-        ) au ON au.solicitud_id = s.solicitud_id
+    $tieneTramiteIdInicial = cneSolicitudesTieneTramiteIdInicial($db);
+    $tidEtqSql = cneSqlExpresionTramiteIdEtiqueta($tieneTramiteIdInicial);
+    $joinTramEtq = "
+        LEFT JOIN tramite t_etq ON t_etq.tramite_id = $tidEtqSql
+        LEFT JOIN tramite tp_etq ON tp_etq.tramite_id = t_etq.tramite_padre_id
+        LEFT JOIN tramite tp_op ON tp_op.tramite_id = t.tramite_padre_id
     ";
+    $fragFromInner = '
+FROM solicitudes s
+    ' . trim(cneSqlJoinAuditoriaTramiteIdCreacion()) . '
+    JOIN tramite t ON s.tramite_id = t.tramite_id
+    ' . $joinTramEtq . '
+    ' . trim(cneSqlLeftJoinAuditoriaUltimaRedireccion()) . '
+';
     $baseWhere = " WHERE $coordWhere";
     $params = [':cid' => $cid];
 
@@ -70,7 +70,7 @@ try {
     }
     if ($estado) {
         if ($estado === 'redirigida') {
-            $baseWhere .= " AND au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid";
+            $baseWhere .= " AND au.coord_destino IS NOT NULL AND (au.coord_origen_id = :cid OR (au.coord_origen_id IS NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid))";
         } elseif ($estado === 'en_revision') {
             $baseWhere .= " AND s.solicitud_estado = 'en_revision' AND (au.coord_destino IS NULL OR COALESCE(au.coord_destino, $coordSelect) = :cid)";
         } else {
@@ -134,9 +134,10 @@ try {
                 s.solicitud_id,
                 s.empleado_asignado_id,
                 s.created_by,
+                au.redirigido_por_id,
                 CASE
                     WHEN s.solicitud_estado = 'invalidada' THEN 'invalidados'
-                    WHEN au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> {$cidInt} THEN 'redirigidos'
+                    WHEN au.coord_destino IS NOT NULL AND (au.coord_origen_id = {$cidInt} OR (au.coord_origen_id IS NULL AND COALESCE(au.coord_destino, $coordSelect) <> {$cidInt})) THEN 'redirigidos'
                     WHEN s.solicitud_estado = 'vencida' THEN 'vencidos'
                     WHEN s.solicitud_estado = 'rechazada' THEN 'vencidos'
                     WHEN cne_rec_car.cne_recibido_caracas_dt IS NOT NULL
@@ -150,12 +151,13 @@ try {
                     WHEN s.solicitud_estado = 'completada' THEN 'completados'
                     ELSE 'en_proceso'
                 END AS categoria
-            FROM solicitudes s
-            JOIN tramite t ON s.tramite_id = t.tramite_id
-            $auSubquery
+            $fragFromInner
             $joinRecRep
             $baseWhere
-        ) sol ON COALESCE(sol.empleado_asignado_id, sol.created_by) = u.user_identificacion
+        ) sol ON (
+            COALESCE(sol.empleado_asignado_id, sol.created_by) = u.user_identificacion
+            OR (sol.redirigido_por_id IS NOT NULL AND sol.redirigido_por_id = u.user_identificacion)
+        )
         WHERE u.coordinacion_id = {$cidInt} AND u.user_estado = 'activo'
         GROUP BY u.user_identificacion, u.user_username, u.user_nombres, u.user_apellidos
         ORDER BY u.user_nombres, u.user_apellidos, u.user_username

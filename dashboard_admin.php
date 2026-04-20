@@ -894,6 +894,13 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
             }
         })();
 
+        const sectionTitles = { usuarios: 'Gestión de Usuarios', catalogos: 'Gestión de Catálogos', ciudadanos: 'Gestión de Ciudadanos', 'buscar-solicitudes': 'Buscar Solicitudes', pantallas: 'Supervisión de Pantallas', respaldos: 'Respaldo de Base de Datos' };
+        const sections = { usuarios: document.getElementById('seccion-usuarios'), catalogos: document.getElementById('seccion-catalogos'), ciudadanos: document.getElementById('seccion-ciudadanos'), 'buscar-solicitudes': document.getElementById('seccion-buscar-solicitudes'), pantallas: document.getElementById('seccion-pantallas'), respaldos: document.getElementById('seccion-respaldos') };
+        function guardarPestañaAdmin(sectionId) {
+            if (!sectionId || !sectionTitles[sectionId]) return;
+            try { localStorage.setItem('admin_active_tab', sectionId); } catch (e) {}
+        }
+
         let ultimosIdsNotif = new Set();
         function inicializarNotificaciones() {
             const btn = document.getElementById('btn-notificaciones');
@@ -921,6 +928,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 document.querySelector('.menu-item[data-section="ciudadanos"]')?.classList.add('active');
                 Object.keys(sections).forEach(k => { sections[k].classList.toggle('block', k === 'ciudadanos'); sections[k].classList.toggle('hidden', k !== 'ciudadanos'); });
                 document.getElementById('section-title').textContent = 'Gestión de Ciudadanos';
+                guardarPestañaAdmin('ciudadanos');
                 cargarCiudadanos();
             });
         }
@@ -995,6 +1003,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     document.querySelector('.menu-item[data-section="ciudadanos"]')?.classList.add('active');
                     Object.keys(sections).forEach(k => { sections[k].classList.toggle('block', k === 'ciudadanos'); sections[k].classList.toggle('hidden', k !== 'ciudadanos'); });
                     document.getElementById('section-title').textContent = 'Gestión de Ciudadanos';
+                    guardarPestañaAdmin('ciudadanos');
                     cargarCiudadanos();
                     if (ciudadanoId && ciudadanoId.startsWith('V-CNE')) {
                         document.getElementById('filtro-ciudadano').value = ciudadanoId;
@@ -1008,11 +1017,10 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
         setInterval(fetchNotificacionesAdmin, 60000);
         fetchNotificacionesAdmin();
 
-        const sectionTitles = { usuarios: 'Gestión de Usuarios', catalogos: 'Gestión de Catálogos', ciudadanos: 'Gestión de Ciudadanos', 'buscar-solicitudes': 'Buscar Solicitudes', pantallas: 'Supervisión de Pantallas', respaldos: 'Respaldo de Base de Datos' };
-        const sections = { usuarios: document.getElementById('seccion-usuarios'), catalogos: document.getElementById('seccion-catalogos'), ciudadanos: document.getElementById('seccion-ciudadanos'), 'buscar-solicitudes': document.getElementById('seccion-buscar-solicitudes'), pantallas: document.getElementById('seccion-pantallas'), respaldos: document.getElementById('seccion-respaldos') };
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', function() {
                 const s = this.dataset.section;
+                guardarPestañaAdmin(s);
                 document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
                 this.classList.add('active');
                 Object.keys(sections).forEach(k => {
@@ -1029,6 +1037,14 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 if (window.innerWidth < 1024) { sidebar.classList.remove('mobile-visible'); sidebar.classList.add('mobile-hidden'); overlay?.classList.remove('active'); }
             });
         });
+        (function restaurarPestañaAdmin() {
+            try {
+                var id = localStorage.getItem('admin_active_tab');
+                if (!id || !sectionTitles[id]) return;
+                var item = document.querySelector('.menu-item[data-section="' + id + '"]');
+                if (item) item.click();
+            } catch (e) {}
+        })();
 
         let pantallaRoleAreaPendiente = null;
         function abrirModalPantallaArea(roleId) {

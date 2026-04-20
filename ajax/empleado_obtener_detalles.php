@@ -24,17 +24,24 @@ try {
         echo json_encode(['success' => false, 'message' => 'Trámite no encontrado']);
         exit;
     }
+    $tramite_id_req = (int) cneResolverTramiteIdParaRequisitos($db, $solicitud_id);
+    if ($tramite_id_req < 1) {
+        $tramite_id_req = (int) ($sol['tramite_id'] ?? 0);
+    }
     $stmt = $db->prepare("
-        SELECT requisito_id
-        FROM requisitos_solicitud
-        WHERE solicitud_id = :sid AND requisitos_solicitud_status = 'aprobado'
+        SELECT rs.requisito_id
+        FROM requisitos_solicitud rs
+        INNER JOIN requisitos r ON r.requisito_id = rs.requisito_id
+            AND r.tramite_id = :tid_req AND r.requisito_activo = 1
+        WHERE rs.solicitud_id = :sid AND rs.requisitos_solicitud_status = 'aprobado'
     ");
-    $stmt->execute([':sid' => $solicitud_id]);
+    $stmt->execute([':sid' => $solicitud_id, ':tid_req' => $tramite_id_req]);
     $aprobados = array_map(function($r){ return (int)$r['requisito_id']; }, $stmt->fetchAll());
     echo json_encode([
         'success' => true,
         'codigo_interno' => $sol['codigo_interno'] ?? null,
         'solicitud_estado' => $sol['solicitud_estado'] ?? null,
+        'tramite_id_requisitos' => $tramite_id_req,
         'requisitos_aprobados' => $aprobados
     ]);
 } catch (Exception $e) {
