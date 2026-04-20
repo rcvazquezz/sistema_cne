@@ -69,11 +69,16 @@ try {
     $avgRow = $stmt->fetch(PDO::FETCH_ASSOC);
     $tiempo_promedio = $avgRow && $avgRow['avg_dias'] !== null ? round((float)$avgRow['avg_dias'], 1) : 0;
 
+    $stmt = $db->prepare("SELECT COUNT(*) as c $baseSql AND s.solicitud_estado = 'invalidada'");
+    $stmt->execute($params);
+    $tramites_invalidados = (int) $stmt->fetchColumn();
+
     $kpis = [
         'total_hoy' => $total_hoy,
         'pendientes' => $pendientes,
         'eficiencia' => $eficiencia,
-        'tiempo_promedio' => $tiempo_promedio
+        'tiempo_promedio' => $tiempo_promedio,
+        'tramites_invalidados' => $tramites_invalidados,
     ];
 
     // Embudo: Entrada -> En Proceso -> Firma -> Listos para Entrega
@@ -107,6 +112,7 @@ try {
     $stmt = $db->prepare("
         SELECT
             CASE
+                WHEN s.solicitud_estado = 'invalidada' THEN 'invalidada'
                 WHEN env.last_env_id IS NOT NULL AND (rec.last_rec_id IS NULL OR env.last_env_id > rec.last_rec_id) THEN 'enviada_caracas'
                 WHEN rec.last_rec_id IS NOT NULL AND (env.last_env_id IS NULL OR rec.last_rec_id > env.last_env_id) THEN 'recibida_caracas'
                 ELSE s.solicitud_estado
@@ -133,19 +139,20 @@ try {
     $estadosRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $estadosMap = [
         'pendiente' => 0, 'en_revision' => 0, 'aprobada' => 0, 'completada' => 0,
-        'redirigida' => 0, 'rechazada' => 0, 'vencida' => 0,
+        'redirigida' => 0, 'rechazada' => 0, 'vencida' => 0, 'invalidada' => 0,
         'enviada_caracas' => 0, 'recibida_caracas' => 0
     ];
     foreach ($estadosRaw as $r) {
         $est = $r['estado_computado'] ?? '';
         if (isset($estadosMap[$est])) $estadosMap[$est] = (int)$r['cantidad'];
     }
-    $ordenLabels = ['Pendiente', 'En Proceso', 'Completado', 'Redirigida', 'Vencida', 'Enviada a Caracas', 'Recibida de Caracas'];
+    $ordenLabels = ['Pendiente', 'En Proceso', 'Completado', 'Redirigida', 'Invalidadas', 'Vencida', 'Enviada a Caracas', 'Recibida de Caracas'];
     $ordenData = [
         $estadosMap['pendiente'],
         $estadosMap['en_revision'] + $estadosMap['aprobada'],
         $estadosMap['completada'],
         $estadosMap['redirigida'],
+        $estadosMap['invalidada'],
         $estadosMap['vencida'] + $estadosMap['rechazada'],
         $estadosMap['enviada_caracas'],
         $estadosMap['recibida_caracas']
@@ -153,7 +160,7 @@ try {
     $chart_estados = [
         'labels' => $ordenLabels,
         'data' => $ordenData,
-        'colors' => ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#f97316', '#06b6d4', '#14b8a6']
+        'colors' => ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#dc2626', '#f97316', '#06b6d4', '#14b8a6']
     ];
 
     // Barras: Rendimiento por Coordinación (solicitudes en el período)

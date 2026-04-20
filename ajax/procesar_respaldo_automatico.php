@@ -10,6 +10,7 @@ date_default_timezone_set('America/Caracas');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/backup_respaldo_lib.php';
+require_once __DIR__ . '/../includes/telegram_backup.php';
 
 /** Segundos: ventana tras guardar en el panel para permitir prueba aunque ultimo sea hoy (legacy) */
 define('RESPALDO_AUTO_VENTANA_CONFIG_SEG', 300);
@@ -95,7 +96,39 @@ try {
 
     $fechaStr = date('Y-m-d H:i:s');
     $tamanioStr = backup_formatoTamano($result['tamanio']);
-    backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $result['filename']);
+
+    $tgEstado = null;
+    $tgMsg = '';
+    if (telegram_esta_configurado()) {
+        $up = enviarRespaldoTelegram($result['filepath']);
+        if ($up['success']) {
+            $tgEstado = 'ok';
+            backup_guardarEstadoTelegram($db, [
+                'ultimo_intento_fecha' => $fechaStr,
+                'ultimo_exito' => true,
+                'ultimo_mensaje' => 'Enviado a Telegram (respaldo automático)',
+                'ultimo_archivo' => $result['filename'],
+            ]);
+        } else {
+            $tgEstado = 'error';
+            $tgMsg = (string) ($up['message'] ?? '');
+            backup_guardarEstadoTelegram($db, [
+                'ultimo_intento_fecha' => $fechaStr,
+                'ultimo_exito' => false,
+                'ultimo_mensaje' => $tgMsg,
+                'ultimo_archivo' => $result['filename'],
+            ]);
+        }
+    } else {
+        $tgEstado = 'omitido';
+        backup_guardarEstadoTelegram($db, [
+            'ultimo_intento_fecha' => $fechaStr,
+            'ultimo_exito' => null,
+            'ultimo_mensaje' => 'Telegram no configurado',
+            'ultimo_archivo' => $result['filename'],
+        ]);
+    }
+    backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $result['filename'], $tgEstado, $tgEstado === 'error' ? $tgMsg : null);
 
     backup_saveRespaldoAutomatico($db, [
         'ultimo_respaldo_fecha' => $hoy,
@@ -109,6 +142,7 @@ try {
         'archivo' => $result['filename'],
         'fecha' => $fechaStr,
         'slot' => $slotKey,
+        'telegram_sync' => $tgEstado,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     error_log('procesar_respaldo_automatico: ' . $e->getMessage());

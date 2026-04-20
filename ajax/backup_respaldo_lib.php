@@ -113,7 +113,7 @@ function backup_saveRespaldoAutomatico($db, array $cfg) {
     backup_saveConfig($db, 'respaldo_automatico', $payload);
 }
 
-function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null) {
+function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null, $telegramEstado = null, $telegramError = null) {
     $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
     if (!is_array($historial)) {
         $historial = [];
@@ -122,9 +122,40 @@ function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null) 
     if ($archivo !== null && $archivo !== '') {
         $row['archivo'] = basename((string) $archivo);
     }
+    if ($telegramEstado !== null && $telegramEstado !== '') {
+        $row['telegram'] = (string) $telegramEstado;
+    }
+    if ($telegramEstado === 'error' && $telegramError !== null && $telegramError !== '') {
+        $row['telegram_error'] = substr((string) $telegramError, 0, 500);
+    }
     array_unshift($historial, $row);
     $historial = array_slice($historial, 0, 5);
     backup_saveConfig($db, 'backup_historial', $historial);
+}
+
+function backup_guardarEstadoTelegram($db, array $payload): void {
+    $prev = backup_getOrCreateConfig($db, 'backup_telegram_ultimo', []);
+    if (!is_array($prev)) {
+        $prev = [];
+    }
+    $merged = array_merge([
+        'ultimo_intento_fecha' => null,
+        'ultimo_exito' => null,
+        'ultimo_mensaje' => '',
+        'ultimo_archivo' => null,
+    ], $prev, $payload);
+    backup_saveConfig($db, 'backup_telegram_ultimo', $merged);
+}
+
+function backup_obtenerEstadoTelegram($db): array {
+    $def = [
+        'ultimo_intento_fecha' => null,
+        'ultimo_exito' => null,
+        'ultimo_mensaje' => '',
+        'ultimo_archivo' => null,
+    ];
+    $val = backup_getOrCreateConfig($db, 'backup_telegram_ultimo', $def);
+    return is_array($val) ? array_merge($def, $val) : $def;
 }
 
 function backup_formatoTamano($bytes) {

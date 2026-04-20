@@ -95,6 +95,10 @@ try {
         $estado = 'pendiente';
         $accion_codigo = 'FUNCIONARIO_REDIRIGE_TRAMITE';
         $accion_desc = 'El funcionario redirige el trámite a otra coordinación';
+    } elseif ($accion === 'invalidar') {
+        $estado = 'invalidada';
+        $accion_codigo = 'FUNCIONARIO_INVALIDA_TRAMITE';
+        $accion_desc = 'El funcionario invalida el trámite';
     } elseif ($accion === 'vencer') {
         $estado = 'vencida';
         $accion_codigo = 'FUNCIONARIO_MARCA_VENCIDA';
@@ -200,42 +204,72 @@ try {
                 $err = $stmt->errorInfo();
                 throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar solicitud'));
             }
-        } else {
-            if ($accion === 'completar') {
-                $stmt = $db->prepare("
-                    UPDATE solicitudes SET 
-                        solicitud_estado = :estado,
-                        empleado_asignado_id = :empleado_id,
-                        codigo_interno = :codigo,
-                        solicitud_fecha_completada = :fecha
-                    WHERE solicitud_id = :id
-                ");
-                $ok = $stmt->execute([
-                    ':estado' => $estado,
-                    ':empleado_id' => $_SESSION['user_id'],
-                    ':codigo' => $codigo_interno ?: null,
-                    ':fecha' => $fecha_completada,
-                    ':id' => $solicitud_id
-                ]);
-            } else {
-                $stmt = $db->prepare("
-                    UPDATE solicitudes SET 
-                        solicitud_estado = :estado,
-                        codigo_interno = :codigo,
-                        solicitud_fecha_completada = :fecha
-                    WHERE solicitud_id = :id
-                ");
-                $ok = $stmt->execute([
-                    ':estado' => $estado,
-                    ':codigo' => $codigo_interno ?: null,
-                    ':fecha' => $fecha_completada,
-                    ':id' => $solicitud_id
-                ]);
-            }
+        } elseif ($accion === 'completar') {
+            $stmt = $db->prepare("
+                UPDATE solicitudes SET 
+                    solicitud_estado = :estado,
+                    empleado_asignado_id = :empleado_id,
+                    codigo_interno = :codigo,
+                    solicitud_fecha_completada = :fecha
+                WHERE solicitud_id = :id
+            ");
+            $ok = $stmt->execute([
+                ':estado' => $estado,
+                ':empleado_id' => $_SESSION['user_id'],
+                ':codigo' => $codigo_interno ?: null,
+                ':fecha' => $fecha_completada,
+                ':id' => $solicitud_id
+            ]);
             if (!$ok) {
                 $err = $stmt->errorInfo();
                 throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar solicitud'));
             }
+        } elseif ($accion === 'invalidar') {
+            $stmt = $db->prepare("
+                UPDATE solicitudes SET
+                    solicitud_estado = :estado,
+                    empleado_asignado_id = NULL,
+                    codigo_interno = :codigo,
+                    solicitud_fecha_completada = NULL
+                WHERE solicitud_id = :id
+            ");
+            $ok = $stmt->execute([
+                ':estado' => $estado,
+                ':codigo' => $codigo_interno ?: null,
+                ':id' => $solicitud_id
+            ]);
+            if (!$ok) {
+                $err = $stmt->errorInfo();
+                throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al invalidar solicitud'));
+            }
+            try {
+                $chkObs = $db->query("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'solicitudes' AND COLUMN_NAME = 'observaciones'");
+                if ((bool) $chkObs->fetchColumn()) {
+                    $stObs = $db->prepare('UPDATE solicitudes SET observaciones = :obs WHERE solicitud_id = :id');
+                    $stObs->execute([':obs' => $observaciones, ':id' => $solicitud_id]);
+                }
+            } catch (Exception $e) {
+            }
+        } elseif ($accion === 'vencer') {
+            $stmt = $db->prepare("
+                UPDATE solicitudes SET 
+                    solicitud_estado = :estado,
+                    codigo_interno = :codigo,
+                    solicitud_fecha_completada = :fecha
+                WHERE solicitud_id = :id
+            ");
+            $ok = $stmt->execute([
+                ':estado' => $estado,
+                ':codigo' => $codigo_interno ?: null,
+                ':fecha' => $fecha_completada,
+                ':id' => $solicitud_id
+            ]);
+            if (!$ok) {
+                $err = $stmt->errorInfo();
+                throw new Exception('SQLSTATE ' . ($err[0] ?? '') . ' ' . ($err[2] ?? 'Fallo al actualizar solicitud'));
+            }
+        } else {
+            throw new Exception('Acción no soportada en actualización');
         }
     } catch (Exception $e) {
         http_response_code(500);

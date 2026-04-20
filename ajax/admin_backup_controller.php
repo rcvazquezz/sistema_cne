@@ -3,6 +3,7 @@ date_default_timezone_set('America/Caracas');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/backup_respaldo_lib.php';
+require_once __DIR__ . '/../includes/telegram_backup.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -20,6 +21,8 @@ try {
         case 'get_config':
             $cfg = backup_getRespaldoAutomatico($db);
             $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
+            $tgUlt = backup_obtenerEstadoTelegram($db);
+            $tgUlt['configurado'] = telegram_esta_configurado();
             echo json_encode([
                 'success' => true,
                 'config' => [
@@ -29,6 +32,7 @@ try {
                     'ultimo_auto_slot' => $cfg['ultimo_auto_slot'] ?? null,
                 ],
                 'historial' => is_array($historial) ? $historial : [],
+                'telegram_ultimo' => $tgUlt,
             ], JSON_UNESCAPED_UNICODE);
             break;
 
@@ -45,7 +49,13 @@ try {
 
         case 'get_historial':
             $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
-            echo json_encode(['success' => true, 'historial' => is_array($historial) ? $historial : []]);
+            $tgUlt = backup_obtenerEstadoTelegram($db);
+            $tgUlt['configurado'] = telegram_esta_configurado();
+            echo json_encode([
+                'success' => true,
+                'historial' => is_array($historial) ? $historial : [],
+                'telegram_ultimo' => $tgUlt,
+            ], JSON_UNESCAPED_UNICODE);
             break;
 
         case 'generar':
@@ -59,7 +69,49 @@ try {
             $tamanioStr = backup_formatoTamano($tamanio);
             $estado = $exportado ? 'Completado' : 'Error';
 
-            backup_addToHistorial($db, $fechaStr, $tamanioStr, $estado, $exportado ? $filename : null);
+            $tgEstado = null;
+            $tgMsg = '';
+            if ($exportado) {
+                if (telegram_esta_configurado()) {
+                    $up = enviarRespaldoTelegram($filepath);
+                    if ($up['success']) {
+                        $tgEstado = 'ok';
+                        backup_guardarEstadoTelegram($db, [
+                            'ultimo_intento_fecha' => $fechaStr,
+                            'ultimo_exito' => true,
+                            'ultimo_mensaje' => 'Enviado a Telegram',
+                            'ultimo_archivo' => $filename,
+                        ]);
+                    } else {
+                        $tgEstado = 'error';
+                        $tgMsg = (string) ($up['message'] ?? 'Error desconocido');
+                        backup_guardarEstadoTelegram($db, [
+                            'ultimo_intento_fecha' => $fechaStr,
+                            'ultimo_exito' => false,
+                            'ultimo_mensaje' => $tgMsg,
+                            'ultimo_archivo' => $filename,
+                        ]);
+                    }
+                } else {
+                    $tgEstado = 'omitido';
+                    backup_guardarEstadoTelegram($db, [
+                        'ultimo_intento_fecha' => $fechaStr,
+                        'ultimo_exito' => null,
+                        'ultimo_mensaje' => 'Telegram no configurado (falta bot_token o chat_id)',
+                        'ultimo_archivo' => $filename,
+                    ]);
+                }
+            }
+
+            backup_addToHistorial(
+                $db,
+                $fechaStr,
+                $tamanioStr,
+                $estado,
+                $exportado ? $filename : null,
+                $tgEstado,
+                $tgEstado === 'error' ? $tgMsg : null
+            );
 
             if (isset($_GET['descargar']) && $_GET['descargar'] === '1') {
                 header('Content-Type: application/octet-stream');
@@ -69,13 +121,27 @@ try {
                 exit;
             }
 
+            $mensajeCliente = 'Error al generar respaldo';
+            if ($exportado) {
+                if ($tgEstado === 'ok') {
+                    $mensajeCliente = 'Respaldo generado localmente y enviado a Telegram';
+                } elseif ($tgEstado === 'error') {
+                    $mensajeCliente = 'Respaldo generado localmente. No se pudo enviar a Telegram: ' . $tgMsg;
+                } elseif ($tgEstado === 'omitido') {
+                    $mensajeCliente = 'Respaldo generado localmente. Telegram no está configurado.';
+                } else {
+                    $mensajeCliente = 'Respaldo generado correctamente';
+                }
+            }
+
             echo json_encode([
                 'success' => $exportado,
-                'message' => $exportado ? 'Respaldo generado correctamente' : 'Error al generar respaldo',
+                'message' => $mensajeCliente,
                 'archivo' => $filename,
                 'tamanio' => $tamanioStr,
                 'fecha' => $fechaStr,
                 'estado' => $estado,
+                'telegram_sync' => $tgEstado,
                 'ruta_descarga' => 'ajax/admin_backup_controller.php?action=generar&descargar=1&ts=' . time(),
             ]);
             break;

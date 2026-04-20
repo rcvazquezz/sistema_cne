@@ -99,6 +99,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
         .reporte-estado-completado { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
         .reporte-estado-vencido { background: #e9ecef; color: #343a40; border: 1px solid #6c757d; }
         .reporte-estado-redirigido { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+        .reporte-estado-invalidada { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         .reporte-estado-default { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
         .metricas-powerbi { height: calc(100vh - 120px); overflow: hidden; display: flex; flex-direction: column; }
         .chart-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 1rem; flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -109,6 +110,8 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
         .palette-slate { background: linear-gradient(135deg, #475569 0%, #64748b 100%); color: #fff; }
         .palette-success { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #fff; }
         .palette-alert { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); color: #fff; }
+        .palette-danger { background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%); color: #fff; }
+        .status-invalidada { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
         .dot-activo { background-color: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse-green 2s infinite; }
         .dot-inactivo { background-color: #94a3b8; }
@@ -274,8 +277,8 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                         </div>
                         <button id="btn-aplicar-metricas" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"><i class="fas fa-sync-alt mr-1"></i> Actualizar</button>
                     </div>
-                    <!-- 4 KPI Cards -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 flex-shrink-0">
+                    <!-- KPIs métricas -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-3 flex-shrink-0">
                         <div class="kpi-card-exec palette-blue">
                             <p class="text-xs text-blue-100">Total Solicitudes Hoy</p>
                             <p class="text-2xl md:text-3xl font-bold" id="kpi-total-hoy">0</p>
@@ -291,6 +294,10 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                         <div class="kpi-card-exec palette-alert">
                             <p class="text-xs text-amber-100">Tiempo Prom. Respuesta</p>
                             <p class="text-2xl md:text-3xl font-bold" id="kpi-tiempo">0 días</p>
+                        </div>
+                        <div class="kpi-card-exec palette-danger">
+                            <p class="text-xs text-red-100 flex items-center gap-1"><i class="fas fa-exclamation-triangle"></i> Trámites invalidados</p>
+                            <p class="text-2xl md:text-3xl font-bold" id="kpi-tramites-invalidados">0</p>
                         </div>
                     </div>
                     <!-- Grid de Gráficos ORE Global -->
@@ -608,8 +615,8 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
     </div>
 
     <script>
-        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigida', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO' };
-        const estClass = { pendiente: 'status-pendiente', en_revision: 'status-proceso', completada: 'status-completado', redirigida: 'status-redirigido', aprobada: 'status-proceso', rechazada: 'status-vencido', vencida: 'status-vencido' };
+        const estLabels = { pendiente: 'Pendiente', en_revision: 'En Proceso', completada: 'Completada', redirigida: 'Redirigida', aprobada: 'En Proceso', rechazada: 'VENCIDO', vencida: 'VENCIDO', invalidada: 'Invalidada' };
+        const estClass = { pendiente: 'status-pendiente', en_revision: 'status-proceso', completada: 'status-completado', redirigida: 'status-redirigido', aprobada: 'status-proceso', rechazada: 'status-vencido', vencida: 'status-vencido', invalidada: 'status-invalidada' };
 
         const sidebar = document.getElementById('sidebar');
         const menuBtn = document.getElementById('menu-btn');
@@ -774,6 +781,8 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                     document.getElementById('kpi-pendientes-m').textContent = k.pendientes ?? 0;
                     document.getElementById('kpi-eficiencia').textContent = (k.eficiencia ?? 0) + '%';
                     document.getElementById('kpi-tiempo').textContent = (k.tiempo_promedio ?? 0) + ' días';
+                    const kinv = document.getElementById('kpi-tramites-invalidados');
+                    if (kinv) kinv.textContent = k.tramites_invalidados ?? 0;
                     const coordSelect = document.getElementById('metricas-coordinacion');
                     if (d.coordinaciones && coordSelect && coordSelect.options.length <= 1) {
                         d.coordinaciones.forEach(c => { coordSelect.add(new Option(c.coordinacion_nombre, c.coordinacion_id)); });
@@ -797,7 +806,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                     }
                     window._metricasBarData = { headers: ['Coordinación','Procesadas'], rows: bc.labels.map((l,i)=>[l, bc.data[i] ?? 0]) };
                     const ce = d.chart_estados || { labels: [], data: [], colors: [] };
-                    const coloresEstados = ce.colors && ce.colors.length ? ce.colors : ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#f97316','#06b6d4','#14b8a6'];
+                    const coloresEstados = ce.colors && ce.colors.length ? ce.colors : ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#dc2626','#f97316','#06b6d4','#14b8a6'];
                     if (chartInstances['estados']) { chartInstances['estados'].destroy(); chartInstances['estados'] = null; }
                     const ctxEst = document.getElementById('chart-estados');
                     if (ctxEst) {
@@ -1166,7 +1175,8 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                 'vencido': 'VENCIDO',
                 'rechazada': 'VENCIDO',
                 'redirigida': 'Redirigido',
-                'redirigido': 'Redirigido'
+                'redirigido': 'Redirigido',
+                'invalidada': 'Invalidada'
             };
             if (map[low]) return map[low];
             if (/^en[\s_-]+revisi[oó]n$/i.test(raw)) return 'En Proceso';
@@ -1181,6 +1191,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
             if (t === 'completado') return 'reporte-estado-completado';
             if (t === 'vencido' || t === 'vencida') return 'reporte-estado-vencido';
             if (t === 'redirigido') return 'reporte-estado-redirigido';
+            if (t === 'invalidada' || t === 'invalidado') return 'reporte-estado-invalidada';
             return 'reporte-estado-default';
         }
 
@@ -1193,6 +1204,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
         function etiquetaEstadoDirector(est) {
             const e = (est || '').toLowerCase();
             if (e === 'completada') return 'Culminado';
+            if (e === 'invalidada') return 'Invalidada';
             if (e === 'redirigida') return 'Redirigido';
             if (e === 'vencida' || e === 'rechazada') return 'VENCIDO';
             if (e === 'aprobada') return 'En Proceso';
@@ -1203,6 +1215,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
             const e = (est || '').toLowerCase();
             if (e === 'completada') return 'status-completado';
             if (e === 'pendiente') return 'status-pendiente';
+            if (e === 'invalidada') return 'status-invalidada';
             if (e === 'redirigida') return 'status-dir-redirigida';
             if (e === 'vencida' || e === 'rechazada') return 'status-vencido';
             if (e === 'aprobada') return 'status-proceso';

@@ -126,6 +126,7 @@ try {
             SUM(CASE WHEN sol.categoria = 'completados' THEN 1 ELSE 0 END) AS completados,
             SUM(CASE WHEN sol.categoria = 'vencidos' THEN 1 ELSE 0 END) AS vencidos,
             SUM(CASE WHEN sol.categoria = 'redirigidos' THEN 1 ELSE 0 END) AS redirigidos,
+            SUM(CASE WHEN sol.categoria = 'invalidados' THEN 1 ELSE 0 END) AS invalidados,
             COUNT(sol.solicitud_id) AS total
         FROM usuarios u
         LEFT JOIN (
@@ -134,12 +135,13 @@ try {
                 s.empleado_asignado_id,
                 s.created_by,
                 CASE
+                    WHEN s.solicitud_estado = 'invalidada' THEN 'invalidados'
                     WHEN au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> {$cidInt} THEN 'redirigidos'
                     WHEN s.solicitud_estado = 'vencida' THEN 'vencidos'
                     WHEN s.solicitud_estado = 'rechazada' THEN 'vencidos'
                     WHEN cne_rec_car.cne_recibido_caracas_dt IS NOT NULL
                         AND TIMESTAMPDIFF(DAY, cne_rec_car.cne_recibido_caracas_dt, NOW()) > {$dPlazoRep}
-                        AND s.solicitud_estado NOT IN ('completada','vencida','rechazada')
+                        AND s.solicitud_estado NOT IN ('completada','vencida','rechazada','invalidada')
                         AND (au.coord_destino IS NULL OR COALESCE(au.coord_destino, $coordSelect) = {$cidInt}) THEN 'vencidos'
                     WHEN s.solicitud_estado = 'pendiente'
                         AND (au.coord_destino IS NULL OR COALESCE(au.coord_destino, $coordSelect) = {$cidInt}) THEN 'pendientes'
@@ -169,6 +171,7 @@ try {
             'completados' => (int)($row['completados'] ?? 0),
             'vencidos' => (int)($row['vencidos'] ?? 0),
             'redirigidos' => (int)($row['redirigidos'] ?? 0),
+            'invalidados' => (int)($row['invalidados'] ?? 0),
             'total' => (int)($row['total'] ?? 0),
         ];
     }

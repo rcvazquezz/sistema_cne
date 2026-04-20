@@ -84,6 +84,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         .status-redirigido { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
         /* Vencido: gris (diferenciado de completado / verde) */
         .status-vencido { background:#e9ecef; color:#343a40; border:1px solid #6c757d; }
+        .status-invalidada { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
         .status-en-caracas { background:#ccfbf1; color:#0d9488; border:1px solid #5eead4; }
         /* Historial: badges compactos sin ensanchar la tabla */
         #tabla-historial-empleado .status-badge { padding: 2px 6px; font-size: 11px; border-radius: 6px; font-weight: 600; line-height: 1.25; }
@@ -114,6 +115,20 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             background: rgba(15, 23, 42, 0.72);
         }
         #redirigir-modal .modal-content-redirigir {
+            max-width: 28rem;
+            width: 95%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+        }
+        #invalidar-modal.modal {
+            z-index: 70;
+            background: transparent;
+        }
+        #invalidar-modal .modal-backdrop-invalidar {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.72);
+        }
+        #invalidar-modal .modal-content-invalidar {
             max-width: 28rem;
             width: 95%;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
@@ -905,6 +920,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                                     <option value="completada">Completada</option>
                                     <option value="redirigida">Redirigida</option>
                                     <option value="vencida">Vencido</option>
+                                    <option value="invalidada">Invalidada</option>
                                 </select>
                             </div>
                             <div>
@@ -1069,6 +1085,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 <button class="btn btn-secondary opacity-50 cursor-not-allowed" id="btn-enviar" disabled><i class="fas fa-paper-plane"></i> Enviar a Caracas</button>
                 <button class="btn btn-secondary opacity-50 cursor-not-allowed" id="btn-recibir" disabled><i class="fas fa-inbox"></i> Recibido de Caracas</button>
                 <button class="btn btn-warning opacity-50 cursor-not-allowed" id="btn-redirigir" disabled><i class="fas fa-share"></i> Redirigir</button>
+                <button type="button" class="btn btn-danger opacity-50 cursor-not-allowed" id="btn-invalidar" disabled><i class="fas fa-ban"></i> Invalidar</button>
                 <button class="btn btn-secondary" id="btn-detalles"><i class="fas fa-info-circle"></i> Detalles</button>
             </div>
         </div>
@@ -1116,6 +1133,34 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             </div>
             <div class="px-5 py-3 sm:px-6 sm:py-4 border-t border-gray-200 bg-gray-50/90 flex flex-wrap gap-3 justify-end shrink-0">
                 <button type="button" class="btn btn-warning" id="redirigir-confirm"><i class="fas fa-share"></i> Confirmar Redirección</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Invalidar (motivo obligatorio; mismo apilamiento que Redirigir) -->
+    <div id="invalidar-modal" class="modal p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="invalidar-modal-titulo">
+        <div class="modal-backdrop-invalidar" id="invalidar-backdrop" aria-hidden="true"></div>
+        <div class="modal-content modal-content-invalidar relative z-[1] flex flex-col max-h-[90vh] min-h-0 overflow-hidden rounded-xl border border-red-200/80">
+            <div class="px-5 py-3 border-b border-red-100 bg-red-50/80 flex items-center justify-between gap-2 shrink-0">
+                <div>
+                    <p class="text-xs font-medium text-red-800/90 uppercase tracking-wide">Acción irreversible</p>
+                    <h3 id="invalidar-modal-titulo" class="text-base font-semibold text-gray-900">Invalidar trámite</h3>
+                </div>
+                <button type="button" id="invalidar-close" class="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-white/80 shrink-0" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 sm:p-6 space-y-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                <p class="text-sm text-gray-600">Indique el <strong>motivo</strong> de la invalidación. Se guardará en observaciones y en el historial del trámite.</p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="invalidar-motivo">Motivo *</label>
+                    <textarea id="invalidar-motivo" rows="4" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-200 focus:border-red-400 text-sm" placeholder="Describa el motivo (mínimo 5 caracteres)" required></textarea>
+                    <p id="invalidar-motivo-hint" class="text-xs mt-1 text-gray-500">Mínimo 5 caracteres: 0/5</p>
+                </div>
+            </div>
+            <div class="px-5 py-3 sm:px-6 sm:py-4 border-t border-gray-200 bg-gray-50/90 flex flex-wrap gap-3 justify-end shrink-0">
+                <button type="button" class="btn btn-secondary" id="invalidar-cancelar">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="invalidar-confirm"><i class="fas fa-ban"></i> Confirmar invalidación</button>
             </div>
         </div>
     </div>
@@ -1290,6 +1335,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         let currentSolicitud = null;
         const modal = document.getElementById('solicitud-modal');
         const REDIRIGIR_MODAL = document.getElementById('redirigir-modal');
+        const INVALIDAR_MODAL = document.getElementById('invalidar-modal');
         const COORDINACIONES = <?php echo json_encode(array_map(function ($c) {
             return ['id' => (int) $c['id'], 'nombre' => presentarNombreCoordinacionUi($c['nombre'])];
         }, $coordinaciones), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
@@ -3420,10 +3466,13 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         function cardSolicitud(s) {
             const noGestionableCard = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
             const vencido = esTramiteVencidoNoGestion(s);
-            const soloDetallesCard = noGestionableCard || s.solicitud_estado === 'completada' || vencido;
+            const soloDetallesCard = noGestionableCard || s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || vencido;
             let estadoClass = 'status-pendiente';
             let estadoText = 'Pendiente';
-            if (vencido) {
+            if (s.solicitud_estado === 'invalidada') {
+                estadoClass = 'status-invalidada';
+                estadoText = 'Invalidada';
+            } else if (vencido) {
                 estadoClass = 'status-vencido';
                 estadoText = 'VENCIDO';
             } else if (s.solicitud_estado === 'en_revision' || s.solicitud_estado === 'en_proceso') {
@@ -3528,7 +3577,10 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         function rowHistorial(s) {
             let estadoClass = 'status-pendiente', estadoText = 'Pendiente';
             const vencido = esTramiteVencidoNoGestion(s);
-            if (vencido) {
+            if (s.solicitud_estado === 'invalidada') {
+                estadoClass = 'status-invalidada';
+                estadoText = 'Invalidada';
+            } else if (vencido) {
                 estadoClass = 'status-vencido';
                 estadoText = 'VENCIDO';
             } else {
@@ -3545,7 +3597,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 }
             }
             const noGestionable = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
-            const soloDetalles = noGestionable || s.solicitud_estado === 'completada' || vencido;
+            const soloDetalles = noGestionable || s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || vencido;
             const rowOpacity = noGestionable ? 'opacity-75' : '';
             const tramiteEsc = escapeHtmlHistorial(s.tramite_nombre || '');
             const caracasHtml = s.en_caracas
@@ -3571,6 +3623,10 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         }
 
         function abrirModal(s) {
+            if (s.solicitud_estado === 'invalidada') {
+                mostrarHistorial(s);
+                return;
+            }
             if (esTramiteVencidoNoGestion(s)) {
                 mostrarHistorial(s);
                 return;
@@ -3586,19 +3642,19 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             `;
             cargarDetalles(s.solicitud_id, s.tramite_id);
             // Reset botones a deshabilitado visualmente
-            ['btn-iniciar','btn-completar','btn-redirigir','btn-enviar','btn-recibir'].forEach(id => {
+            ['btn-iniciar','btn-completar','btn-redirigir','btn-invalidar','btn-enviar','btn-recibir'].forEach(id => {
                 const b = document.getElementById(id);
                 if (b) { b.disabled = true; b.classList.add('opacity-50','cursor-not-allowed'); }
             });
-            // Completada, vencida / vencido por plazo o sin permiso: ocultar acciones de gestión
+            // Completada, invalidada, vencida / vencido por plazo o sin permiso: ocultar acciones de gestión
             const noGestionable = (s.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(s.coordinacion_id) !== String(MI_COORDINACION_ID));
-            if (s.solicitud_estado === 'completada' || noGestionable || esTramiteVencidoNoGestion(s)) {
-                ['btn-iniciar','btn-completar','btn-redirigir'].forEach(id => {
+            if (s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || noGestionable || esTramiteVencidoNoGestion(s)) {
+                ['btn-iniciar','btn-completar','btn-redirigir','btn-invalidar'].forEach(id => {
                     const b = document.getElementById(id);
                     if (b) b.classList.add('hidden');
                 });
             } else {
-                ['btn-iniciar','btn-completar','btn-redirigir'].forEach(id => {
+                ['btn-iniciar','btn-completar','btn-redirigir','btn-invalidar'].forEach(id => {
                     const b = document.getElementById(id);
                     if (b) b.classList.remove('hidden');
                 });
@@ -3612,7 +3668,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const enviarBtn = document.getElementById('btn-enviar');
             const recibirBtn = document.getElementById('btn-recibir');
             if (enviarBtn && recibirBtn) {
-                if (esTramiteVencidoNoGestion(s) || s.solicitud_estado === 'completada' || noGestionable) {
+                if (esTramiteVencidoNoGestion(s) || s.solicitud_estado === 'completada' || s.solicitud_estado === 'invalidada' || noGestionable) {
                     enviarBtn.classList.add('hidden');
                     recibirBtn.classList.add('hidden');
                 } else if (s.solicitud_estado === 'en_revision') {
@@ -3747,6 +3803,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             });
             document.getElementById('btn-completar')?.addEventListener('click', () => ejecutarAccion('completar'));
             document.getElementById('btn-redirigir')?.addEventListener('click', () => abrirRedirigir());
+            document.getElementById('btn-invalidar')?.addEventListener('click', () => abrirInvalidar());
             document.getElementById('btn-detalles')?.addEventListener('click', () => {
                 mostrarHistorial();
             });
@@ -3754,13 +3811,14 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             document.getElementById('btn-recibir')?.addEventListener('click', () => guardarProgreso(false, 'recibir'));
             const obs = document.getElementById('modal-observaciones');
             const botonesGestion = ['btn-completar', 'btn-redirigir'].map(id => document.getElementById(id)).filter(Boolean);
+            const btnInvalidar = document.getElementById('btn-invalidar');
             const btnIniciar = document.getElementById('btn-iniciar');
             const obsCounter = document.getElementById('obs-counter');
             const btnEnviar = document.getElementById('btn-enviar');
             const btnRecibir = document.getElementById('btn-recibir');
             const toggle = () => {
                 const ok = (obs.value || '').trim().length >= 10;
-                const deshabilitar = (currentSolicitud?.solicitud_estado === 'redirigida') || (MI_COORDINACION_ID && String(currentSolicitud?.coordinacion_id) !== String(MI_COORDINACION_ID)) || esTramiteVencidoNoGestion(currentSolicitud);
+                const deshabilitar = (currentSolicitud?.solicitud_estado === 'redirigida') || (currentSolicitud?.solicitud_estado === 'invalidada') || (MI_COORDINACION_ID && String(currentSolicitud?.coordinacion_id) !== String(MI_COORDINACION_ID)) || esTramiteVencidoNoGestion(currentSolicitud);
                 botonesGestion.forEach(b => {
                     const disabled = deshabilitar || !ok;
                     b.disabled = disabled;
@@ -3770,6 +3828,16 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                         b.classList.remove('opacity-50', 'cursor-not-allowed');
                     }
                 });
+                if (btnInvalidar) {
+                    const invHidden = btnInvalidar.classList.contains('hidden');
+                    const disabledInv = deshabilitar || invHidden;
+                    btnInvalidar.disabled = disabledInv;
+                    if (disabledInv) {
+                        btnInvalidar.classList.add('opacity-50', 'cursor-not-allowed');
+                    } else {
+                        btnInvalidar.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                }
                 if (btnIniciar) {
                     const disabled = deshabilitar || !ok;
                     btnIniciar.disabled = disabled;
@@ -3878,6 +3946,72 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             REDIRIGIR_MODAL.classList.remove('active');
         });
 
+        function syncInvalidarMotivoHint() {
+            const ta = document.getElementById('invalidar-motivo');
+            const hint = document.getElementById('invalidar-motivo-hint');
+            if (!ta || !hint) return;
+            const len = (ta.value || '').trim().length;
+            const ok = len >= 5;
+            hint.textContent = 'Mínimo 5 caracteres: ' + Math.min(len, 5) + '/5';
+            hint.classList.toggle('text-green-600', ok);
+            hint.classList.toggle('text-gray-500', !ok);
+        }
+        function abrirInvalidar() {
+            const ta = document.getElementById('invalidar-motivo');
+            if (ta) ta.value = '';
+            syncInvalidarMotivoHint();
+            if (INVALIDAR_MODAL) INVALIDAR_MODAL.classList.add('active');
+        }
+        function cerrarModalInvalidar() {
+            if (INVALIDAR_MODAL) INVALIDAR_MODAL.classList.remove('active');
+        }
+        document.getElementById('invalidar-close')?.addEventListener('click', cerrarModalInvalidar);
+        document.getElementById('invalidar-backdrop')?.addEventListener('click', cerrarModalInvalidar);
+        document.getElementById('invalidar-cancelar')?.addEventListener('click', cerrarModalInvalidar);
+        document.getElementById('invalidar-motivo')?.addEventListener('input', syncInvalidarMotivoHint);
+        document.getElementById('invalidar-confirm')?.addEventListener('click', () => {
+            const motivo = (document.getElementById('invalidar-motivo')?.value || '').trim();
+            if (motivo.length < 5) {
+                alert('Debe indicar un motivo de invalidación (mínimo 5 caracteres).');
+                return;
+            }
+            ejecutarInvalidar(motivo);
+        });
+
+        function ejecutarInvalidar(motivo) {
+            if (!currentSolicitud) return;
+            if (esTramiteVencidoNoGestion(currentSolicitud)) {
+                alert('Este trámite está vencido y no admite esta acción.');
+                return;
+            }
+            const codigo = document.getElementById('modal-codigo').value.trim();
+            const body = new URLSearchParams();
+            body.set('solicitud_id', currentSolicitud.solicitud_id);
+            body.set('accion', 'invalidar');
+            body.set('codigo_interno', codigo);
+            body.set('observaciones', motivo);
+            fetch('ajax/empleado_actualizar_solicitud.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    cerrarModalInvalidar();
+                    modal.classList.remove('active');
+                    const ta = document.getElementById('invalidar-motivo');
+                    if (ta) ta.value = '';
+                    syncInvalidarMotivoHint();
+                    cargarPendientes();
+                    cargarHistorial();
+                } else {
+                    alert(data.message || 'Error al invalidar');
+                }
+            })
+            .catch(() => alert('Error al invalidar'));
+        }
+
         function ejecutarAccion(accion, destinoCoord = null) {
             if (!currentSolicitud) return;
             if (esTramiteVencidoNoGestion(currentSolicitud)) {
@@ -3934,11 +4068,19 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             aplicarEstiloHeaderModalHistorial(false);
         }
 
-        function aplicarEstiloHeaderModalHistorial(vencido, etiqueta) {
+        function aplicarEstiloHeaderModalHistorial(vencido, etiqueta, invalidada) {
+            invalidada = !!invalidada;
             const h = document.getElementById('modal-historial-header');
             const wrap = document.getElementById('modal-historial-estado-wrap');
             const badge = document.getElementById('modal-historial-estado-badge');
             if (!h || !wrap || !badge) return;
+            if (invalidada) {
+                h.className = 'flex justify-between items-center px-5 py-4 shrink-0 bg-gradient-to-r from-red-900 via-red-800 to-red-600 text-white';
+                wrap.classList.remove('hidden');
+                badge.textContent = etiqueta || 'Invalidada';
+                badge.className = 'status-badge status-invalidada text-xs align-middle';
+                return;
+            }
             if (vencido) {
                 h.className = 'flex justify-between items-center px-5 py-4 shrink-0 bg-gradient-to-r from-slate-600 via-slate-600 to-slate-500 text-white';
                 wrap.classList.remove('hidden');
@@ -3957,7 +4099,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
             const content = document.getElementById('modal-historial-timeline');
             const numEl = document.getElementById('modal-historial-numero');
             if (!modal || !content || !numEl) return;
-            aplicarEstiloHeaderModalHistorial(!!opciones.vencido, opciones.estadoEtiqueta);
+            aplicarEstiloHeaderModalHistorial(!!opciones.vencido, opciones.estadoEtiqueta, !!opciones.invalidada);
             numEl.textContent = numeroSeguimiento || '—';
             if (!eventos || !eventos.length) {
                 content.innerHTML = '<div class="text-center py-10 text-gray-500"><i class="fas fa-inbox text-4xl text-gray-300 mb-3 block"></i>No hay registros de auditoría u observaciones para este trámite.</div>';
@@ -3996,8 +4138,13 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 }
                 const eventos = data.eventos || [];
                 const num = data.solicitud_numero || sol.solicitud_numero || '';
-                const venc = esTramiteVencidoNoGestion(sol);
-                abrirModalHistorialTramite(eventos, num, { vencido: venc, estadoEtiqueta: 'VENCIDO' });
+                const inv = (sol.solicitud_estado || '').toLowerCase() === 'invalidada';
+                const venc = !inv && esTramiteVencidoNoGestion(sol);
+                abrirModalHistorialTramite(eventos, num, {
+                    vencido: venc,
+                    invalidada: inv,
+                    estadoEtiqueta: inv ? 'Invalidada' : 'VENCIDO'
+                });
             })
             .catch(() => alert('Error al obtener historial'));
         }

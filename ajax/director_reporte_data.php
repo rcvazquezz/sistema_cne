@@ -130,6 +130,7 @@ try {
                    co.coordinacion_nombre AS area_nombre, t.tramite_nombre AS tipo_tramite,
                    ({$caseRegistro}) AS registro_tipo,
                    ({$caseEstRep}) AS estado_computado,
+                   (SELECT ds.detalle_texto FROM detalles_solicitud ds WHERE ds.solicitud_id = s.solicitud_id ORDER BY ds.detalle_id DESC LIMIT 1) AS motivo_observacion,
                    DATE_FORMAT(s.solicitud_created_at, '%d/%m/%Y %h:%i %p') AS fecha_registro
             FROM solicitudes s
             JOIN ciudadanos c ON s.ciudadano_identificacion = c.ciudadano_identificacion
@@ -174,7 +175,13 @@ try {
             }
         }
         unset($r);
-        echo json_encode(['success' => true, 'rows' => $rows, 'headers' => ['N° Seguimiento', 'Ciudadano', 'Área', 'Tipo', 'Registro', 'Estado', 'Fecha/Hora'], 'subtitulo' => $subtitulo], JSON_UNESCAPED_UNICODE);
+        foreach ($rows as &$r2) {
+            if (array_key_exists('motivo_observacion', $r2) && ($r2['motivo_observacion'] === null || $r2['motivo_observacion'] === '')) {
+                $r2['motivo_observacion'] = '—';
+            }
+        }
+        unset($r2);
+        echo json_encode(['success' => true, 'rows' => $rows, 'headers' => ['N° Seguimiento', 'Ciudadano', 'Área', 'Tipo', 'Registro', 'Estado', 'Motivo / Observación', 'Fecha/Hora'], 'subtitulo' => $subtitulo], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -218,7 +225,7 @@ try {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
-        $map = ['Pendiente' => 0, 'En Proceso' => 0, 'Completada' => 0, 'Vencida' => 0, 'Redirigida' => 0];
+        $map = ['Pendiente' => 0, 'En Proceso' => 0, 'Completada' => 0, 'Vencida' => 0, 'Redirigida' => 0, 'Invalidada' => 0];
         foreach ($rows as $r) {
             $e = $r['estado_computado'] ?? '';
             $c = (int)$r['cantidad'];
@@ -227,6 +234,7 @@ try {
             elseif ($e === 'completada') $map['Completada'] += $c;
             elseif ($e === 'vencida') $map['Vencida'] += $c;
             elseif ($e === 'redirigida') $map['Redirigida'] += $c;
+            elseif ($e === 'invalidada') $map['Invalidada'] += $c;
         }
         $rows = array_map(fn($k,$v) => [$k, $v], array_keys($map), array_values($map));
         echo json_encode(['success' => true, 'rows' => $rows, 'headers' => ['Métrica', 'Valor'], 'subtitulo' => $subtitulo], JSON_UNESCAPED_UNICODE);

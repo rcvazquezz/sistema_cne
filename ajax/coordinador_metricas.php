@@ -132,7 +132,7 @@ try {
         OR (
             cne_rec_car.cne_recibido_caracas_dt IS NOT NULL
             AND TIMESTAMPDIFF(DAY, cne_rec_car.cne_recibido_caracas_dt, NOW()) > {$dPlazo}
-            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada')
+            AND s.solicitud_estado NOT IN ('completada','vencida','rechazada','invalidada')
         )
     )");
     $stmt->execute($params);
@@ -141,6 +141,10 @@ try {
     $stmt = $db->prepare("SELECT COUNT(*) as c $baseSql AND au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid");
     $stmt->execute($params);
     $kpis['redirigidos'] = (int)$stmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT COUNT(*) as c $baseSql AND s.solicitud_estado = 'invalidada'");
+    $stmt->execute($params);
+    $kpis['invalidados'] = (int) $stmt->fetchColumn();
 
     $condRedCoord = "au.coord_destino IS NOT NULL AND COALESCE(au.coord_destino, $coordSelect) <> :cid";
     $caseCoord = cneSqlCaseEstadoParaReporte($condRedCoord);
@@ -170,6 +174,7 @@ try {
     $pushBar($chartBar, 'Pendiente', (int)($porEstadoMap['pendiente'] ?? 0), '#f59e0b');
     $pushBar($chartBar, 'En Proceso', $enProcChart, '#3b82f6');
     $pushBar($chartBar, 'Completada', (int)($porEstadoMap['completada'] ?? 0), '#10b981');
+    $pushBar($chartBar, 'Invalidada', (int)($porEstadoMap['invalidada'] ?? 0), '#dc2626');
     $pushBar($chartBar, 'Redirigida', (int)($porEstadoMap['redirigida'] ?? 0), '#8b5cf6');
     $pushBar($chartBar, 'Vencidos', $vencChart, '#6c757d');
 

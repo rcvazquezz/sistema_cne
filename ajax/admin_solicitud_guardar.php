@@ -12,8 +12,17 @@ if (!isset($_SESSION['user_id']) || (int) ($_SESSION['rol_id'] ?? 0) !== 5) {
 $solicitud_id = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
 $solicitud_estado = trim($_POST['solicitud_estado'] ?? '');
 $tramite_id = isset($_POST['tramite_id']) ? (int) $_POST['tramite_id'] : 0;
+$requisitos_raw = $_POST['requisitos'] ?? '';
 
-$estados_validos = ['pendiente', 'en_revision', 'aprobada', 'rechazada', 'completada', 'redirigida'];
+$estados_validos = ['pendiente', 'en_revision', 'aprobada', 'rechazada', 'completada', 'redirigida', 'vencida', 'invalidada'];
+
+$seleccionados_req = [];
+if ($requisitos_raw !== '' && $requisitos_raw !== null) {
+    $tmp = json_decode((string) $requisitos_raw, true);
+    if (is_array($tmp)) {
+        $seleccionados_req = array_values(array_unique(array_filter(array_map('intval', $tmp))));
+    }
+}
 
 if ($solicitud_id < 1 || !in_array($solicitud_estado, $estados_validos, true) || $tramite_id < 1) {
     echo json_encode(['success' => false, 'message' => 'Datos incompletos o no válidos']);
@@ -72,6 +81,33 @@ try {
             ':est' => $solicitud_estado,
             ':sid' => $solicitud_id,
         ]);
+    }
+
+    $permiteEditarRequisitos = in_array(
+        $solicitud_estado,
+        ['en_revision', 'completada', 'redirigida', 'invalidada'],
+        true
+    );
+    if ($permiteEditarRequisitos && $requisitos_raw !== '' && $requisitos_raw !== null) {
+        $stmt = $db->prepare('SELECT requisito_id FROM requisitos WHERE tramite_id = :tid AND requisito_activo = 1');
+        $stmt->execute([':tid' => $tramite_id]);
+        $validIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        foreach ($seleccionados_req as $rid) {
+            if (!in_array($rid, $validIds, true)) {
+                throw new Exception('Hay requisitos que no corresponden al tipo de trámite seleccionado');
+            }
+        }
+        $db->prepare('DELETE FROM requisitos_solicitud WHERE solicitud_id = :sid')->execute([':sid' => $solicitud_id]);
+        if ($validIds) {
+            $ins = $db->prepare('
+                INSERT INTO requisitos_solicitud (solicitud_id, requisito_id, requisitos_solicitud_status)
+                VALUES (:sid, :rid, :st)
+            ');
+            foreach ($validIds as $rid) {
+                $st = in_array($rid, $seleccionados_req, true) ? 'aprobado' : 'pendiente';
+                $ins->execute([':sid' => $solicitud_id, ':rid' => $rid, ':st' => $st]);
+            }
+        }
     }
 
     $detalle = 'Actualización administrativa del trámite / estado de la solicitud ' . $numero . ' (datos personales no modificados).';
