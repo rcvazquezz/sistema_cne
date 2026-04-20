@@ -38,7 +38,7 @@ try {
     }
 
     $stmt = $db->prepare("
-        SELECT ciudadano_identificacion, ciudadano_nombres, ciudadano_apellidos, ciudadano_genero, estado_id
+        SELECT ciudadano_identificacion, ciudadano_nombres, ciudadano_apellidos, ciudadano_genero, estado_id, institucion_id
         FROM ciudadanos
         WHERE ciudadano_identificacion = :cid
     ");
@@ -62,6 +62,8 @@ try {
     unset($row);
     $estados = $db->query("SELECT estado_id, estado_nombre FROM estados ORDER BY estado_nombre")->fetchAll(PDO::FETCH_ASSOC);
 
+    $instituciones = $db->query("SELECT institucion_id, institucion_nombre FROM institucion ORDER BY institucion_nombre")->fetchAll(PDO::FETCH_ASSOC);
+
     echo json_encode([
         'success' => true,
         'solicitud' => [
@@ -77,10 +79,12 @@ try {
             'ciudadano_apellidos' => '',
             'ciudadano_genero' => null,
             'estado_id' => null,
+            'institucion_id' => null,
         ],
         'tramites' => $tramites,
         'coordinaciones' => $coords,
         'estados' => $estados,
+        'instituciones' => $instituciones,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     error_log('admin_solicitud_edicion_datos: ' . $e->getMessage());

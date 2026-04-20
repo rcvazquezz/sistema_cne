@@ -113,7 +113,7 @@ function backup_saveRespaldoAutomatico($db, array $cfg) {
     backup_saveConfig($db, 'respaldo_automatico', $payload);
 }
 
-function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null, $telegramEstado = null, $telegramError = null) {
+function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null, $envioEstado = null, $envioError = null) {
     $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
     if (!is_array($historial)) {
         $historial = [];
@@ -122,19 +122,19 @@ function backup_addToHistorial($db, $fecha, $tamanio, $estado, $archivo = null, 
     if ($archivo !== null && $archivo !== '') {
         $row['archivo'] = basename((string) $archivo);
     }
-    if ($telegramEstado !== null && $telegramEstado !== '') {
-        $row['telegram'] = (string) $telegramEstado;
+    if ($envioEstado !== null && $envioEstado !== '') {
+        $row['email'] = (string) $envioEstado;
     }
-    if ($telegramEstado === 'error' && $telegramError !== null && $telegramError !== '') {
-        $row['telegram_error'] = substr((string) $telegramError, 0, 500);
+    if ($envioEstado === 'error' && $envioError !== null && $envioError !== '') {
+        $row['email_error'] = substr((string) $envioError, 0, 500);
     }
     array_unshift($historial, $row);
     $historial = array_slice($historial, 0, 5);
     backup_saveConfig($db, 'backup_historial', $historial);
 }
 
-function backup_guardarEstadoTelegram($db, array $payload): void {
-    $prev = backup_getOrCreateConfig($db, 'backup_telegram_ultimo', []);
+function backup_guardarEstadoCorreo($db, array $payload): void {
+    $prev = backup_getOrCreateConfig($db, 'backup_correo_ultimo', []);
     if (!is_array($prev)) {
         $prev = [];
     }
@@ -144,18 +144,37 @@ function backup_guardarEstadoTelegram($db, array $payload): void {
         'ultimo_mensaje' => '',
         'ultimo_archivo' => null,
     ], $prev, $payload);
-    backup_saveConfig($db, 'backup_telegram_ultimo', $merged);
+    backup_saveConfig($db, 'backup_correo_ultimo', $merged);
 }
 
-function backup_obtenerEstadoTelegram($db): array {
+function backup_obtenerEstadoCorreo($db): array {
     $def = [
         'ultimo_intento_fecha' => null,
         'ultimo_exito' => null,
         'ultimo_mensaje' => '',
         'ultimo_archivo' => null,
     ];
-    $val = backup_getOrCreateConfig($db, 'backup_telegram_ultimo', $def);
+    $val = backup_getOrCreateConfig($db, 'backup_correo_ultimo', $def);
+    if (!is_array($val) || (empty($val['ultimo_intento_fecha']) && empty($val['ultimo_mensaje']))) {
+        $legacy = backup_getOrCreateConfig($db, 'backup_telegram_ultimo', []);
+        if (is_array($legacy) && (!empty($legacy['ultimo_intento_fecha']) || !empty($legacy['ultimo_mensaje']))) {
+            $val = array_merge($def, $legacy);
+        }
+    }
     return is_array($val) ? array_merge($def, $val) : $def;
+}
+
+/**
+ * Nombre de la base de datos actual (para asunto/cuerpo del correo de respaldo).
+ */
+function backup_obtenerNombreBaseDatos(PDO $db): string
+{
+    try {
+        $n = $db->query('SELECT DATABASE()')->fetchColumn();
+        return $n ? (string) $n : 'cne_sistema';
+    } catch (Exception $e) {
+        return 'cne_sistema';
+    }
 }
 
 function backup_formatoTamano($bytes) {

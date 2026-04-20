@@ -12,6 +12,7 @@ if (!isset($_SESSION['user_id']) || (int) ($_SESSION['rol_id'] ?? 0) !== 5) {
 $solicitud_id = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
 $solicitud_estado = trim($_POST['solicitud_estado'] ?? '');
 $tramite_id = isset($_POST['tramite_id']) ? (int) $_POST['tramite_id'] : 0;
+$institucion_id_raw = trim((string) ($_POST['institucion_id'] ?? ''));
 $requisitos_raw = $_POST['requisitos'] ?? '';
 
 $estados_validos = ['pendiente', 'en_revision', 'aprobada', 'rechazada', 'completada', 'redirigida', 'vencida', 'invalidada'];
@@ -50,6 +51,26 @@ try {
     }
 
     $db->beginTransaction();
+
+    $institucion_id_val = null;
+    if ($institucion_id_raw !== '') {
+        $iid = (int) $institucion_id_raw;
+        if ($iid < 1) {
+            throw new Exception('Institución no válida');
+        }
+        $chkInst = $db->prepare('SELECT 1 FROM institucion WHERE institucion_id = ? LIMIT 1');
+        $chkInst->execute([$iid]);
+        if (!$chkInst->fetchColumn()) {
+            throw new Exception('La institución indicada no existe en el catálogo');
+        }
+        $institucion_id_val = $iid;
+    }
+
+    $updCiu = $db->prepare('UPDATE ciudadanos SET institucion_id = :iid WHERE ciudadano_identificacion = :cid');
+    $updCiu->execute([
+        ':iid' => $institucion_id_val,
+        ':cid' => $ciudadano_id,
+    ]);
 
     $hasCoordAct = false;
     try {
@@ -110,7 +131,7 @@ try {
         }
     }
 
-    $detalle = 'Actualización administrativa del trámite / estado de la solicitud ' . $numero . ' (datos personales no modificados).';
+    $detalle = 'Actualización administrativa del trámite / estado de la solicitud ' . $numero . ' (institución del ciudadano actualizada si aplica).';
     $stmt = $db->prepare("
         INSERT INTO detalles_solicitud (solicitud_id, detalle_texto, creado_por)
         VALUES (:sid, :txt, :uid)
@@ -133,6 +154,7 @@ try {
             'ciudadano_identificacion' => $ciudadano_id,
             'solicitud_estado' => $solicitud_estado,
             'tramite_id' => $tramite_id,
+            'institucion_id' => $institucion_id_val,
         ]
     );
 

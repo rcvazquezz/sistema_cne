@@ -3,7 +3,7 @@ date_default_timezone_set('America/Caracas');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/backup_respaldo_lib.php';
-require_once __DIR__ . '/../includes/telegram_backup.php';
+require_once __DIR__ . '/../includes/email_backup.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -21,8 +21,8 @@ try {
         case 'get_config':
             $cfg = backup_getRespaldoAutomatico($db);
             $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
-            $tgUlt = backup_obtenerEstadoTelegram($db);
-            $tgUlt['configurado'] = telegram_esta_configurado();
+            $mailUlt = backup_obtenerEstadoCorreo($db);
+            $mailUlt['configurado'] = email_esta_configurado();
             echo json_encode([
                 'success' => true,
                 'config' => [
@@ -32,7 +32,7 @@ try {
                     'ultimo_auto_slot' => $cfg['ultimo_auto_slot'] ?? null,
                 ],
                 'historial' => is_array($historial) ? $historial : [],
-                'telegram_ultimo' => $tgUlt,
+                'email_ultimo' => $mailUlt,
             ], JSON_UNESCAPED_UNICODE);
             break;
 
@@ -49,12 +49,12 @@ try {
 
         case 'get_historial':
             $historial = backup_getOrCreateConfig($db, 'backup_historial', []);
-            $tgUlt = backup_obtenerEstadoTelegram($db);
-            $tgUlt['configurado'] = telegram_esta_configurado();
+            $mailUlt = backup_obtenerEstadoCorreo($db);
+            $mailUlt['configurado'] = email_esta_configurado();
             echo json_encode([
                 'success' => true,
                 'historial' => is_array($historial) ? $historial : [],
-                'telegram_ultimo' => $tgUlt,
+                'email_ultimo' => $mailUlt,
             ], JSON_UNESCAPED_UNICODE);
             break;
 
@@ -69,35 +69,46 @@ try {
             $tamanioStr = backup_formatoTamano($tamanio);
             $estado = $exportado ? 'Completado' : 'Error';
 
-            $tgEstado = null;
-            $tgMsg = '';
+            $soloDescarga = isset($_GET['descargar']) && $_GET['descargar'] === '1';
+            if ($soloDescarga && $exportado && is_readable($filepath)) {
+                backup_addToHistorial($db, $fechaStr, $tamanioStr, $estado, $filename, 'omitido', null);
+                header('Content-Type: application/octet-stream');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                header('Content-Length: ' . (string) filesize($filepath));
+                readfile($filepath);
+                exit;
+            }
+
+            $mailEstado = null;
+            $mailMsg = '';
             if ($exportado) {
-                if (telegram_esta_configurado()) {
-                    $up = enviarRespaldoTelegram($filepath);
+                $dbName = backup_obtenerNombreBaseDatos($db);
+                if (email_esta_configurado()) {
+                    $up = enviarRespaldoPorEmail($filepath, $dbName);
                     if ($up['success']) {
-                        $tgEstado = 'ok';
-                        backup_guardarEstadoTelegram($db, [
+                        $mailEstado = 'ok';
+                        backup_guardarEstadoCorreo($db, [
                             'ultimo_intento_fecha' => $fechaStr,
                             'ultimo_exito' => true,
-                            'ultimo_mensaje' => 'Enviado a Telegram',
+                            'ultimo_mensaje' => 'Enviado por correo electrónico',
                             'ultimo_archivo' => $filename,
                         ]);
                     } else {
-                        $tgEstado = 'error';
-                        $tgMsg = (string) ($up['message'] ?? 'Error desconocido');
-                        backup_guardarEstadoTelegram($db, [
+                        $mailEstado = 'error';
+                        $mailMsg = (string) ($up['message'] ?? 'Error desconocido');
+                        backup_guardarEstadoCorreo($db, [
                             'ultimo_intento_fecha' => $fechaStr,
                             'ultimo_exito' => false,
-                            'ultimo_mensaje' => $tgMsg,
+                            'ultimo_mensaje' => $mailMsg,
                             'ultimo_archivo' => $filename,
                         ]);
                     }
                 } else {
-                    $tgEstado = 'omitido';
-                    backup_guardarEstadoTelegram($db, [
+                    $mailEstado = 'omitido';
+                    backup_guardarEstadoCorreo($db, [
                         'ultimo_intento_fecha' => $fechaStr,
                         'ultimo_exito' => null,
-                        'ultimo_mensaje' => 'Telegram no configurado (falta bot_token o chat_id)',
+                        'ultimo_mensaje' => 'Correo no configurado (config/email_config.php)',
                         'ultimo_archivo' => $filename,
                     ]);
                 }
@@ -109,39 +120,36 @@ try {
                 $tamanioStr,
                 $estado,
                 $exportado ? $filename : null,
-                $tgEstado,
-                $tgEstado === 'error' ? $tgMsg : null
+                $mailEstado,
+                $mailEstado === 'error' ? $mailMsg : null
             );
-
-            if (isset($_GET['descargar']) && $_GET['descargar'] === '1') {
-                header('Content-Type: application/octet-stream');
-                header('Content-Disposition: attachment; filename="' . $filename . '"');
-                header('Content-Length: ' . $tamanio);
-                readfile($filepath);
-                exit;
-            }
 
             $mensajeCliente = 'Error al generar respaldo';
             if ($exportado) {
-                if ($tgEstado === 'ok') {
-                    $mensajeCliente = 'Respaldo generado localmente y enviado a Telegram';
-                } elseif ($tgEstado === 'error') {
-                    $mensajeCliente = 'Respaldo generado localmente. No se pudo enviar a Telegram: ' . $tgMsg;
-                } elseif ($tgEstado === 'omitido') {
-                    $mensajeCliente = 'Respaldo generado localmente. Telegram no está configurado.';
+                if ($mailEstado === 'ok') {
+                    $mensajeCliente = 'Respaldo generado y enviado por correo (archivo local eliminado tras el envío)';
+                } elseif ($mailEstado === 'error') {
+                    $mensajeCliente = 'Respaldo generado localmente. No se pudo enviar por correo: ' . $mailMsg;
+                } elseif ($mailEstado === 'omitido') {
+                    $mensajeCliente = 'Respaldo generado localmente. Configure SMTP en config/email_config.php para envío automático.';
                 } else {
                     $mensajeCliente = 'Respaldo generado correctamente';
                 }
             }
 
+            $archivoRespuesta = null;
+            if ($exportado && $mailEstado !== 'ok') {
+                $archivoRespuesta = $filename;
+            }
+
             echo json_encode([
                 'success' => $exportado,
                 'message' => $mensajeCliente,
-                'archivo' => $filename,
+                'archivo' => $archivoRespuesta,
                 'tamanio' => $tamanioStr,
                 'fecha' => $fechaStr,
                 'estado' => $estado,
-                'telegram_sync' => $tgEstado,
+                'email_sync' => $mailEstado,
                 'ruta_descarga' => 'ajax/admin_backup_controller.php?action=generar&descargar=1&ts=' . time(),
             ]);
             break;

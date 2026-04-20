@@ -366,6 +366,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cédula</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Género</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coordinación</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Institución</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo trámite</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registrado por</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
@@ -470,7 +471,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     </div>
                     <div class="bg-white rounded-xl p-4 md:p-6 shadow mb-6">
                         <h3 class="text-gray-800 font-semibold mb-4 flex items-center gap-2"><i class="fas fa-clock text-blue-600 mr-1"></i> Respaldo Automático</h3>
-                        <p class="text-xs text-gray-500 mb-3">Con la sesión de administrador abierta, el panel consulta al servidor cada 30 segundos; el servidor (zona America/Caracas) acepta el respaldo durante todo el minuto programado (p. ej. 20:04:00–20:04:59). La configuración se guarda en <code class="text-xs bg-gray-100 px-1 rounded">configuracion_sistema</code> bajo la clave <code class="text-xs bg-gray-100 px-1 rounded">respaldo_automatico</code> (JSON). Los archivos se envían al grupo de Telegram configurado en <code class="text-xs bg-gray-100 px-1 rounded">config/telegram_config.php</code>. También puede programar <code class="text-xs bg-gray-100 px-1 rounded">cron/backup_automatico.php</code> (CLI).</p>
+                        <p class="text-xs text-gray-500 mb-3">Con la sesión de administrador abierta, el panel consulta al servidor cada 30 segundos; el servidor (zona America/Caracas) acepta el respaldo durante todo el minuto programado (p. ej. 20:04:00–20:04:59). La configuración se guarda en <code class="text-xs bg-gray-100 px-1 rounded">configuracion_sistema</code> bajo la clave <code class="text-xs bg-gray-100 px-1 rounded">respaldo_automatico</code> (JSON). Los archivos generados se comprimen en ZIP y se envían por correo (SMTP) según <code class="text-xs bg-gray-100 px-1 rounded">config/email_config.php</code>. También puede programar <code class="text-xs bg-gray-100 px-1 rounded">cron/backup_automatico.php</code> (CLI).</p>
                         <div class="flex flex-wrap items-center gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Hora programada</label>
@@ -489,7 +490,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     </div>
                     <div class="bg-white rounded-xl p-4 md:p-6 shadow">
                         <h3 class="text-gray-800 font-semibold mb-3 flex items-center gap-2"><i class="fas fa-history text-blue-600 mr-1"></i> Últimos 5 respaldos</h3>
-                        <p id="backup-indicador-telegram" class="text-sm mb-3 rounded-lg px-3 py-2 bg-gray-50 border border-gray-100 text-gray-700 hidden" role="status"></p>
+                        <p id="backup-indicador-email" class="text-sm mb-3 rounded-lg px-3 py-2 bg-gray-50 border border-gray-100 text-gray-700 hidden" role="status"></p>
                         <div class="table-responsive overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
@@ -497,7 +498,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tamaño</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sincronización Telegram</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Envío por correo</th>
                                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Descarga</th>
                                     </tr>
                                 </thead>
@@ -601,6 +602,12 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Coordinación *</label>
                             <select id="edit-sol-coordinacion" required class="w-full p-3 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-sm"></select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Institución</label>
+                            <select id="edit-sol-institucion-id" name="institucion_id" class="w-full p-3 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 text-sm">
+                                <option value="">— Sin institución —</option>
+                            </select>
                         </div>
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Tipo de trámite *</label>
@@ -1276,6 +1283,16 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     }).join('');
                     selC.value = String(sol.coordinacion_id);
 
+                    const selInst = document.getElementById('edit-sol-institucion-id');
+                    if (selInst) {
+                        selInst.innerHTML = '<option value="">— Sin institución —</option>' + (d.instituciones || []).map(function(inst) {
+                            return '<option value="' + inst.institucion_id + '">' + escapeHtmlAdmin(inst.institucion_nombre || '') + '</option>';
+                        }).join('');
+                        const iid = ciu.institucion_id;
+                        if (iid != null && iid !== '') selInst.value = String(iid);
+                        else selInst.value = '';
+                    }
+
                     llenarSelectTramitesAdmin(d.tramites, sol.tramite_id);
 
                     cargarRequisitosListaSolAdmin(sol.solicitud_id, sol.tramite_id);
@@ -1330,6 +1347,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                                 '<td class="px-4 py-3 font-mono">' + escapeHtmlAdmin(t.ciudadano_identificacion) + '</td>' +
                                 '<td class="px-4 py-3">' + escapeHtmlAdmin(t.ciudadano_genero) + '</td>' +
                                 '<td class="px-4 py-3 max-w-[120px]">' + escapeHtmlAdmin(t.area_nombre) + '</td>' +
+                                '<td class="px-4 py-3 max-w-[140px]">' + escapeHtmlAdmin(t.institucion_nombre || '—') + '</td>' +
                                 '<td class="px-4 py-3 max-w-[140px]">' + escapeHtmlAdmin(t.tipo_tramite_nombre) + '</td>' +
                                 '<td class="px-4 py-3 max-w-[120px]">' + escapeHtmlAdmin(t.creado_por) + '</td>' +
                                 '<td class="px-4 py-3 whitespace-nowrap text-gray-600">' + escapeHtmlAdmin(t.fecha_registro) + '</td>' +
@@ -1411,6 +1429,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     fd.append('solicitud_id', document.getElementById('edit-sol-id').value);
                     fd.append('solicitud_estado', document.getElementById('edit-solicitud-estado').value);
                     fd.append('tramite_id', document.getElementById('edit-sol-tramite').value);
+                    fd.append('institucion_id', document.getElementById('edit-sol-institucion-id') ? document.getElementById('edit-sol-institucion-id').value : '');
                     fd.append('requisitos', JSON.stringify(obtenerRequisitosMarcadosSolAdmin()));
                     fetch('ajax/admin_solicitud_guardar.php', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })
                         .then(r => r.json())
@@ -1890,26 +1909,26 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 .catch(() => {});
         }
 
-        function actualizarIndicadorTelegram(du) {
-            const el = document.getElementById('backup-indicador-telegram');
+        function actualizarIndicadorEmailCorreo(du) {
+            const el = document.getElementById('backup-indicador-email');
             if (!el) return;
             el.classList.remove('hidden');
             if (!du || du.configurado === false) {
-                el.textContent = 'Sincronización Telegram: no configurado (edite config/telegram_config.php: bot_token, chat_id, nombre_instancia).';
+                el.textContent = 'Correo SMTP: no configurado (edite config/email_config.php: SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_TO_EMAIL, etc.).';
                 el.className = 'text-sm mb-3 rounded-lg px-3 py-2 bg-amber-50 border border-amber-100 text-amber-900';
                 return;
             }
             if (du.ultimo_exito === true) {
-                el.textContent = 'Sincronización Telegram: último envío correcto' + (du.ultimo_intento_fecha ? ' — ' + du.ultimo_intento_fecha : '') + (du.ultimo_archivo ? ' — ' + du.ultimo_archivo : '');
+                el.textContent = 'Último envío por correo: correcto' + (du.ultimo_intento_fecha ? ' — ' + du.ultimo_intento_fecha : '') + (du.ultimo_archivo ? ' — ' + du.ultimo_archivo : '');
                 el.className = 'text-sm mb-3 rounded-lg px-3 py-2 bg-emerald-50 border border-emerald-100 text-emerald-900';
                 return;
             }
             if (du.ultimo_exito === false) {
-                el.textContent = 'Sincronización Telegram: falló el último envío — ' + (du.ultimo_mensaje || '') + (du.ultimo_intento_fecha ? ' (' + du.ultimo_intento_fecha + ')' : '');
+                el.textContent = 'Último envío por correo: error — ' + (du.ultimo_mensaje || '') + (du.ultimo_intento_fecha ? ' (' + du.ultimo_intento_fecha + ')' : '');
                 el.className = 'text-sm mb-3 rounded-lg px-3 py-2 bg-red-50 border border-red-100 text-red-900';
                 return;
             }
-            el.textContent = 'Sincronización Telegram: pendiente del primer envío o sin intentos recientes.';
+            el.textContent = 'Correo: pendiente del primer envío o sin intentos recientes.';
             el.className = 'text-sm mb-3 rounded-lg px-3 py-2 bg-gray-50 border border-gray-100 text-gray-700';
         }
 
@@ -1922,7 +1941,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                 const cb = document.getElementById('backup-activo');
                 cb.checked = !!(cfg.activado !== undefined ? cfg.activado : cfg.activo);
                 document.getElementById('backup-activo-label').textContent = cb.checked ? 'On' : 'Off';
-                if (d.telegram_ultimo) actualizarIndicadorTelegram(d.telegram_ultimo);
+                if (d.email_ultimo) actualizarIndicadorEmailCorreo(d.email_ultimo);
             });
         }
 
@@ -1933,7 +1952,7 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                     const tbody = document.getElementById('tabla-backup-historial');
                     if (!tbody) return;
                     tbody.innerHTML = '';
-                    if (d.telegram_ultimo) actualizarIndicadorTelegram(d.telegram_ultimo);
+                    if (d.email_ultimo) actualizarIndicadorEmailCorreo(d.email_ultimo);
                     const list = d.success ? (d.historial || []) : [];
                     if (!list.length) {
                         tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Sin respaldos registrados</td></tr>';
@@ -1945,23 +1964,23 @@ $CNE_RT = ['dashboard' => 'admin', 'coord' => (int) ($usuario['coordinacion_id']
                         const dl = ok && fn
                             ? '<a class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm" href="ajax/admin_backup_controller.php?action=descargar&archivo=' + encodeURIComponent(fn) + '"><i class="fas fa-download"></i> .sql</a>'
                             : '<span class="text-gray-400 text-sm">—</span>';
-                        const tg = String(h.telegram || h.drive || '').toLowerCase();
-                        let tgCell = '<span class="text-xs text-gray-400">—</span>';
-                        const errTxt = (h.telegram_error != null && h.telegram_error !== '') ? String(h.telegram_error) : '';
+                        const sync = String(h.email || h.telegram || h.drive || '').toLowerCase();
+                        let syncCell = '<span class="text-xs text-gray-400">—</span>';
+                        const errTxt = (h.email_error != null && h.email_error !== '') ? String(h.email_error) : ((h.telegram_error != null && h.telegram_error !== '') ? String(h.telegram_error) : '');
                         const safeTip = errTxt.replace(/"/g, '&quot;').replace(/</g, '').replace(/\s+/g, ' ').substring(0, 400);
-                        if (tg === 'ok') {
-                            tgCell = '<span class="inline-flex items-center gap-1.5 text-sky-700" title="Enviado al grupo de Telegram"><i class="bi bi-telegram text-xl leading-none" aria-hidden="true"></i><span class="text-xs font-semibold">Enviado</span></span>';
-                        } else if (tg === 'error') {
-                            tgCell = '<span class="inline-flex items-center gap-1 text-red-700" title="' + (safeTip || 'Error de envío') + '"><i class="bi bi-exclamation-triangle text-lg" aria-hidden="true"></i><span class="text-xs">Error</span></span>';
-                        } else if (tg === 'omitido') {
-                            tgCell = '<span class="text-xs text-gray-500">N/A</span>';
+                        if (sync === 'ok') {
+                            syncCell = '<span class="inline-flex items-center gap-1.5 text-sky-700" title="Enviado por correo"><i class="fas fa-envelope text-sm" aria-hidden="true"></i><span class="text-xs font-semibold">Enviado</span></span>';
+                        } else if (sync === 'error') {
+                            syncCell = '<span class="inline-flex items-center gap-1 text-red-700" title="' + (safeTip || 'Error de envío') + '"><i class="fas fa-exclamation-triangle text-sm" aria-hidden="true"></i><span class="text-xs">Error</span></span>';
+                        } else if (sync === 'omitido') {
+                            syncCell = '<span class="text-xs text-gray-500">N/A</span>';
                         }
                         const tr = document.createElement('tr');
                         tr.className = 'hover:bg-gray-50';
                         tr.innerHTML = '<td class="px-4 py-2 text-sm text-gray-700">' + escapeHtmlAdmin(h.fecha || '-') + '</td>' +
                             '<td class="px-4 py-2 text-sm text-gray-600">' + escapeHtmlAdmin(h.tamanio || '-') + '</td>' +
                             '<td class="px-4 py-2"><span class="status-badge ' + (ok ? 'status-activo' : 'status-inactivo') + '">' + escapeHtmlAdmin(h.estado || '-') + '</span></td>' +
-                            '<td class="px-4 py-2">' + tgCell + '</td>' +
+                            '<td class="px-4 py-2">' + syncCell + '</td>' +
                             '<td class="px-4 py-2 text-center">' + dl + '</td>';
                         tbody.appendChild(tr);
                     });

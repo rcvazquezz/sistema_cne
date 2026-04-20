@@ -218,6 +218,27 @@ try {
         'data' => array_map(fn($x) => (int)$x['total'], $rendimientoUsuarios)
     ];
 
+    // Barras: distribución por institución (ciudadano.institucion_id; mismos filtros de fecha/coord/trámite)
+    $stmt = $db->prepare("
+        SELECT
+            COALESCE(i.institucion_nombre, 'Sin institución') AS nombre_inst,
+            COUNT(s.solicitud_id) AS total
+        FROM solicitudes s
+        JOIN tramite t ON s.tramite_id = t.tramite_id
+        JOIN ciudadanos ci ON s.ciudadano_identificacion = ci.ciudadano_identificacion
+        LEFT JOIN institucion i ON ci.institucion_id = i.institucion_id
+        $where
+        GROUP BY COALESCE(i.institucion_id, 0), COALESCE(i.institucion_nombre, 'Sin institución')
+        HAVING total > 0
+        ORDER BY total DESC
+    ");
+    $stmt->execute($params);
+    $porInst = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $bar_instituciones = [
+        'labels' => array_map(fn($x) => $x['nombre_inst'], $porInst),
+        'data' => array_map(fn($x) => (int)$x['total'], $porInst),
+    ];
+
     // Coordinaciones para filtro (excluir Oficina de Atención al Ciudadano - solo coordinaciones técnicas)
     try {
         $coordinaciones = $db->query("
@@ -237,6 +258,7 @@ try {
         'chart_estados' => $chart_estados,
         'bar_coordinaciones' => $bar_coordinaciones,
         'chart_rendimiento_usuarios' => $chart_rendimiento_usuarios,
+        'bar_instituciones' => $bar_instituciones,
         'coordinaciones' => $coordinaciones
     ];
     echo json_encode($resp, JSON_UNESCAPED_UNICODE);

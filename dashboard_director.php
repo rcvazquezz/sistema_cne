@@ -332,6 +332,16 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                             </div>
                             <div class="h-64"><canvas id="chart-rendimiento-usuarios"></canvas></div>
                         </div>
+                        <div class="chart-card lg:col-span-3">
+                            <div class="chart-card-header">
+                                <span class="chart-card-title"><i class="fas fa-university text-blue-600 mr-1"></i> Distribución por Instituciones</span>
+                                <div class="flex gap-1">
+                                    <button type="button" class="btn-export-chart text-gray-500 hover:text-blue-600 text-xs px-2 py-1 rounded" data-chart="instituciones" data-format="excel"><i class="fas fa-file-excel"></i></button>
+                                    <button type="button" class="btn-export-chart text-gray-500 hover:text-red-600 text-xs px-2 py-1 rounded" data-chart="instituciones" data-format="pdf"><i class="fas fa-file-pdf"></i></button>
+                                </div>
+                            </div>
+                            <div class="h-72 min-h-[280px]"><canvas id="chart-instituciones"></canvas></div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -653,6 +663,12 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
         let chartInstances = {};
         let flatpickrMetricas = null;
         const PALETTE = { blue: '#1e40af', blueLight: '#3b82f6', slate: '#475569', success: '#10b981', alert: '#f59e0b', amber: '#f59e0b', violet: '#8b5cf6' };
+        const PALETTE_BARS_INST = ['#3b82f6', '#2563eb', '#1d4ed8', '#6366f1', '#0ea5e9', '#64748b', '#10b981', '#06b6d4', '#8b5cf6', '#f59e0b'];
+        function coloresBarrasInstituciones(n) {
+            const out = [];
+            for (let i = 0; i < n; i++) out.push(PALETTE_BARS_INST[i % PALETTE_BARS_INST.length]);
+            return out;
+        }
 
         function cargarGeneral() {
             Promise.all([
@@ -842,6 +858,48 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                         });
                     }
                     window._metricasUsuariosData = { headers: ['Usuario','Trámites'], rows: (ru.labels || []).map((l,i)=>[l, ru.data[i] ?? 0]) };
+                    const bi = d.bar_instituciones || { labels: [], data: [] };
+                    if (chartInstances['instituciones']) { chartInstances['instituciones'].destroy(); chartInstances['instituciones'] = null; }
+                    const ctxInst = document.getElementById('chart-instituciones');
+                    if (ctxInst) {
+                        const nInst = (bi.labels || []).length;
+                        chartInstances['instituciones'] = new Chart(ctxInst, {
+                            type: 'bar',
+                            data: {
+                                labels: bi.labels,
+                                datasets: [{
+                                    label: 'Trámites',
+                                    data: bi.data,
+                                    backgroundColor: coloresBarrasInstituciones(nInst || 1),
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: {
+                                        grid: { display: false },
+                                        ticks: {
+                                            maxRotation: 45,
+                                            minRotation: 0,
+                                            autoSkip: true,
+                                            maxTicksLimit: 24
+                                        }
+                                    },
+                                    y: {
+                                        grid: { color: '#e2e8f0' },
+                                        ticks: { precision: 0, beginAtZero: true }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    window._metricasInstitucionesData = {
+                        headers: ['Institución', 'Trámites'],
+                        rows: (bi.labels || []).map((l, i) => [l, bi.data[i] ?? 0])
+                    };
                 })
                 .catch(err => console.error('[Director Métricas] Error fetch:', err));
         }
@@ -867,6 +925,7 @@ $CNE_RT = ['dashboard' => 'director', 'coord' => (int) ($coordinacion_id ?? 0)];
                 if (chart === 'bar') data = window._metricasBarData;
                 else if (chart === 'estados') data = window._metricasEstadosData;
                 else if (chart === 'usuarios') data = window._metricasUsuariosData;
+                else if (chart === 'instituciones') data = window._metricasInstitucionesData;
                 if (!data || !data.rows) { alert('Cargue las métricas primero.'); return; }
                 if (format === 'excel') {
                     const wb = XLSX.utils.book_new();

@@ -2,7 +2,8 @@
     "name": "cne/sistema",
     "description": "Sistema CNE — tiempo real vía SSE",
     "require": {
-        "php": ">=8.0"
+        "php": ">=8.0",
+        "phpmailer/phpmailer": "6.9"
     },
     "autoload": {
         "psr-4": {

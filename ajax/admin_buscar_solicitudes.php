@@ -49,11 +49,13 @@ try {
             TRIM(CONCAT(TRIM(COALESCE(c.ciudadano_nombres, '')), ' ', TRIM(COALESCE(c.ciudadano_apellidos, '')))) AS ciudadano_nombre,
             COALESCE(c.ciudadano_identificacion, s.ciudadano_identificacion) AS ciudadano_identificacion,
             c.ciudadano_genero,
+            COALESCE(inst.institucion_nombre, '') AS institucion_nombre,
             COALESCE(t.tramite_nombre, '') AS tipo_tramite_nombre,
             COALESCE(co.coordinacion_nombre, '') AS area_nombre,
             TRIM(CONCAT(TRIM(COALESCE(u.user_nombres, '')), ' ', TRIM(COALESCE(u.user_apellidos, '')))) AS creado_por_nombre
         FROM solicitudes s
         LEFT JOIN ciudadanos c ON s.ciudadano_identificacion = c.ciudadano_identificacion
+        LEFT JOIN institucion inst ON c.institucion_id = inst.institucion_id
         LEFT JOIN tramite t ON s.tramite_id = t.tramite_id
         LEFT JOIN coordinacion co ON t.coordinacion_id = co.coordinacion_id
         LEFT JOIN usuarios u ON s.created_by = u.user_identificacion
@@ -70,6 +72,7 @@ try {
             c.ciudadano_apellidos,
             c.ciudadano_identificacion,
             c.ciudadano_genero,
+            inst.institucion_nombre,
             t.tramite_nombre,
             co.coordinacion_nombre,
             u.user_nombres,
@@ -112,6 +115,7 @@ try {
             'ciudadano_nombre' => $nombre,
             'ciudadano_identificacion' => $row['ciudadano_identificacion'] ?? '',
             'ciudadano_genero' => $genero_labels[$gen] ?? ($gen !== '' ? $gen : 'No especificado'),
+            'institucion_nombre' => trim((string) ($row['institucion_nombre'] ?? '')) !== '' ? trim($row['institucion_nombre']) : '—',
             'tipo_tramite_nombre' => $row['tipo_tramite_nombre'] !== '' ? $row['tipo_tramite_nombre'] : '—',
             'area_nombre' => $row['area_nombre'] !== '' ? $row['area_nombre'] : '—',
             'creado_por' => trim((string) ($row['creado_por_nombre'] ?? '')) !== '' ? trim($row['creado_por_nombre']) : '—',

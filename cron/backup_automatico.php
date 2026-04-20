@@ -3,7 +3,7 @@
  * Respaldo SQL por cron (sin sesión web). Ejemplo en Windows (Programador de tareas):
  *   C:\laragon\bin\php\php-8.3.30-Win32-vs16-x64\php.exe C:\laragon\www\sistema_cne\cron\backup_automatico.php
  *
- * Genera backup_YYYY-mm-dd_HH-ii-ss.sql y envía el archivo a Telegram si está configurado.
+ * Genera backup_YYYY-mm-dd_HH-ii-ss.sql y lo envía por correo (ZIP + SMTP) si está configurado.
  */
 declare(strict_types=1);
 
@@ -18,7 +18,7 @@ date_default_timezone_set('America/Caracas');
 
 require_once dirname(__DIR__) . '/config/database.php';
 require_once dirname(__DIR__) . '/ajax/backup_respaldo_lib.php';
-require_once dirname(__DIR__) . '/includes/telegram_backup.php';
+require_once dirname(__DIR__) . '/includes/email_backup.php';
 
 try {
     $db = getDB();
@@ -38,42 +38,47 @@ $filename = $result['filename'];
 $filepath = $result['filepath'];
 $tamanioStr = backup_formatoTamano($result['tamanio']);
 
-$tgEstado = 'omitido';
+$dbName = backup_obtenerNombreBaseDatos($db);
+$mailEstado = 'omitido';
 $msg = null;
-if (telegram_esta_configurado()) {
-    $up = enviarRespaldoTelegram($filepath);
+if (email_esta_configurado()) {
+    $up = enviarRespaldoPorEmail($filepath, $dbName);
     if ($up['success']) {
-        $tgEstado = 'ok';
-        backup_guardarEstadoTelegram($db, [
+        $mailEstado = 'ok';
+        backup_guardarEstadoCorreo($db, [
             'ultimo_intento_fecha' => $fechaStr,
             'ultimo_exito' => true,
-            'ultimo_mensaje' => 'Enviado a Telegram (cron)',
+            'ultimo_mensaje' => 'Enviado por correo (cron)',
             'ultimo_archivo' => $filename,
         ]);
-        fwrite(STDOUT, "Telegram: OK — {$filename}" . PHP_EOL);
+        fwrite(STDOUT, "Correo: OK — {$filename}" . PHP_EOL);
     } else {
-        $tgEstado = 'error';
+        $mailEstado = 'error';
         $msg = (string) ($up['message'] ?? 'Error desconocido');
-        backup_guardarEstadoTelegram($db, [
+        backup_guardarEstadoCorreo($db, [
             'ultimo_intento_fecha' => $fechaStr,
             'ultimo_exito' => false,
             'ultimo_mensaje' => $msg,
             'ultimo_archivo' => $filename,
         ]);
-        fwrite(STDERR, 'Telegram: error — ' . $msg . PHP_EOL);
-        telegram_log_respaldo('cron: ' . $msg);
+        fwrite(STDERR, 'Correo: error — ' . $msg . PHP_EOL);
+        email_log_respaldo('cron: ' . $msg);
     }
 } else {
-    backup_guardarEstadoTelegram($db, [
+    backup_guardarEstadoCorreo($db, [
         'ultimo_intento_fecha' => $fechaStr,
         'ultimo_exito' => null,
-        'ultimo_mensaje' => 'Telegram no configurado (cron)',
+        'ultimo_mensaje' => 'Correo no configurado (cron)',
         'ultimo_archivo' => $filename,
     ]);
-    fwrite(STDOUT, 'Telegram: omitido (sin configuración)' . PHP_EOL);
+    fwrite(STDOUT, 'Correo: omitido (sin SMTP en email_config.php)' . PHP_EOL);
 }
 
-backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $filename, $tgEstado, $tgEstado === 'error' ? $msg : null);
+backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $filename, $mailEstado, $mailEstado === 'error' ? $msg : null);
 
-fwrite(STDOUT, "Respaldo local: {$filename} ({$tamanioStr})" . PHP_EOL);
+if ($mailEstado === 'ok') {
+    fwrite(STDOUT, "Archivos temporales eliminados tras envío por correo ({$filename})." . PHP_EOL);
+} else {
+    fwrite(STDOUT, "Respaldo local: {$filename} ({$tamanioStr})" . PHP_EOL);
+}
 exit(0);

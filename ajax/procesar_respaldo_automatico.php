@@ -10,7 +10,7 @@ date_default_timezone_set('America/Caracas');
 session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/backup_respaldo_lib.php';
-require_once __DIR__ . '/../includes/telegram_backup.php';
+require_once __DIR__ . '/../includes/email_backup.php';
 
 /** Segundos: ventana tras guardar en el panel para permitir prueba aunque ultimo sea hoy (legacy) */
 define('RESPALDO_AUTO_VENTANA_CONFIG_SEG', 300);
@@ -97,52 +97,55 @@ try {
     $fechaStr = date('Y-m-d H:i:s');
     $tamanioStr = backup_formatoTamano($result['tamanio']);
 
-    $tgEstado = null;
-    $tgMsg = '';
-    if (telegram_esta_configurado()) {
-        $up = enviarRespaldoTelegram($result['filepath']);
+    $dbName = backup_obtenerNombreBaseDatos($db);
+    $mailEstado = null;
+    $mailMsg = '';
+    if (email_esta_configurado()) {
+        $up = enviarRespaldoPorEmail($result['filepath'], $dbName);
         if ($up['success']) {
-            $tgEstado = 'ok';
-            backup_guardarEstadoTelegram($db, [
+            $mailEstado = 'ok';
+            backup_guardarEstadoCorreo($db, [
                 'ultimo_intento_fecha' => $fechaStr,
                 'ultimo_exito' => true,
-                'ultimo_mensaje' => 'Enviado a Telegram (respaldo automático)',
+                'ultimo_mensaje' => 'Enviado por correo (respaldo automático)',
                 'ultimo_archivo' => $result['filename'],
             ]);
         } else {
-            $tgEstado = 'error';
-            $tgMsg = (string) ($up['message'] ?? '');
-            backup_guardarEstadoTelegram($db, [
+            $mailEstado = 'error';
+            $mailMsg = (string) ($up['message'] ?? '');
+            backup_guardarEstadoCorreo($db, [
                 'ultimo_intento_fecha' => $fechaStr,
                 'ultimo_exito' => false,
-                'ultimo_mensaje' => $tgMsg,
+                'ultimo_mensaje' => $mailMsg,
                 'ultimo_archivo' => $result['filename'],
             ]);
         }
     } else {
-        $tgEstado = 'omitido';
-        backup_guardarEstadoTelegram($db, [
+        $mailEstado = 'omitido';
+        backup_guardarEstadoCorreo($db, [
             'ultimo_intento_fecha' => $fechaStr,
             'ultimo_exito' => null,
-            'ultimo_mensaje' => 'Telegram no configurado',
+            'ultimo_mensaje' => 'Correo no configurado',
             'ultimo_archivo' => $result['filename'],
         ]);
     }
-    backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $result['filename'], $tgEstado, $tgEstado === 'error' ? $tgMsg : null);
+    backup_addToHistorial($db, $fechaStr, $tamanioStr, 'Completado', $result['filename'], $mailEstado, $mailEstado === 'error' ? $mailMsg : null);
 
     backup_saveRespaldoAutomatico($db, [
         'ultimo_respaldo_fecha' => $hoy,
         'ultimo_auto_slot' => $slotKey,
     ]);
 
+    $archivoJson = ($mailEstado === 'ok') ? null : $result['filename'];
+
     echo json_encode([
         'success' => true,
         'ejecutado' => true,
         'message' => 'Respaldo automático generado',
-        'archivo' => $result['filename'],
+        'archivo' => $archivoJson,
         'fecha' => $fechaStr,
         'slot' => $slotKey,
-        'telegram_sync' => $tgEstado,
+        'email_sync' => $mailEstado,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     error_log('procesar_respaldo_automatico: ' . $e->getMessage());

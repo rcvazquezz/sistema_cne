@@ -1090,7 +1090,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 <button class="btn btn-secondary opacity-50 cursor-not-allowed" id="btn-enviar" disabled><i class="fas fa-paper-plane"></i> Enviar a Caracas</button>
                 <button class="btn btn-secondary opacity-50 cursor-not-allowed" id="btn-recibir" disabled><i class="fas fa-inbox"></i> Recibido de Caracas</button>
                 <button class="btn btn-warning opacity-50 cursor-not-allowed" id="btn-redirigir" disabled><i class="fas fa-share"></i> Redirigir</button>
-                <button type="button" class="btn btn-danger opacity-50 cursor-not-allowed" id="btn-invalidar" disabled><i class="fas fa-ban"></i> Invalidar</button>
+                <button type="button" class="btn btn-danger" id="btn-invalidar"><i class="fas fa-ban"></i> Invalidar</button>
                 <button class="btn btn-secondary" id="btn-detalles"><i class="fas fa-info-circle"></i> Detalles</button>
             </div>
         </div>
@@ -1338,6 +1338,8 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
         // ===== FIN NUEVA FUNCIÓN =====
 
         let currentSolicitud = null;
+        /** Sincroniza habilitación de botones del modal (se asigna en inicializarAccionesModal). */
+        let syncModalEmpleadoBotones = function() {};
         const modal = document.getElementById('solicitud-modal');
         const REDIRIGIR_MODAL = document.getElementById('redirigir-modal');
         const INVALIDAR_MODAL = document.getElementById('invalidar-modal');
@@ -3690,6 +3692,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 }
             }
             modal.classList.add('active');
+            syncModalEmpleadoBotones();
         }
 
         document.getElementById('modal-close')?.addEventListener('click', () => {
@@ -3838,6 +3841,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 });
                 if (btnInvalidar) {
                     const invHidden = btnInvalidar.classList.contains('hidden');
+                    // Invalidar no depende del mínimo de observaciones: el motivo se pide en el modal secundario.
                     const disabledInv = deshabilitar || invHidden;
                     btnInvalidar.disabled = disabledInv;
                     if (disabledInv) {
@@ -3873,6 +3877,7 @@ $CNE_RT = ['dashboard' => 'empleado', 'coord' => (int) ($coordinacion_id ?? 0)];
                 }
             };
             obs?.addEventListener('input', toggle);
+            syncModalEmpleadoBotones = toggle;
             toggle();
         }
         function guardarProgreso(start = false, caracasAction = '') {
